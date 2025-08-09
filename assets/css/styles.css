@@ -1,0 +1,7 @@
+.ffp-card {background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+.ffp-order {border:1px solid #eee;border-radius:10px;padding:12px;margin:10px 0}
+.ffp-order-head {display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
+.ffp-addons {margin:10px 0;padding:10px;border:1px dashed #ddd;border-radius:10px}
+.ffp-addon-row {display:block;margin:4px 0}
+.ffp-login input {width:100%}
+.ffp-driver-actions {display:flex;gap:8px;margin-bottom:8px}

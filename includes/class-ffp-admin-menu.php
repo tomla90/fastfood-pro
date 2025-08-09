@@ -4,6 +4,7 @@ if (!defined('ABSPATH')) exit;
 class FFP_Admin_Menu {
     public function __construct() {
         add_action('admin_menu', [$this,'menu']);
+        add_action('admin_enqueue_scripts', [$this,'enqueue_assets']); // <- Ny hook
     }
 
     public function menu() {
@@ -27,6 +28,30 @@ class FFP_Admin_Menu {
         add_submenu_page('ffp-orders', 'Innstillinger', 'Innstillinger', 'manage_fastfood', 'ffp-settings', [$this,'render_settings']);
         add_submenu_page('ffp-orders', 'Shortcodes', 'Shortcodes', 'manage_fastfood', 'ffp-shortcodes', [$this,'render_shortcodes']);
         add_submenu_page('ffp-orders', 'Lisens', 'Lisens', 'manage_fastfood', 'ffp-licensing', [$this,'render_licensing_page']);
+    }
+
+    public function enqueue_assets($hook) {
+        // Last kun på vår innstillingsside
+        if (!isset($_GET['page']) || $_GET['page'] !== 'ffp-settings') {
+            return;
+        }
+
+        // JS
+        wp_enqueue_script(
+            'ffp-settings',
+            FFP_URL . 'admin/js/settings.js',
+            ['jquery'],
+            FFP_VERSION,
+            true
+        );
+
+        // CSS
+        wp_enqueue_style(
+            'ffp-settings',
+            FFP_URL . 'assets/css/settings.css',
+            [],
+            FFP_VERSION
+        );
     }
 
     private function view($file) {

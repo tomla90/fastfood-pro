@@ -1,237 +1,195 @@
 <?php
 /**
- * FastFood Pro – Settings screen
+ * FastFood Pro – Settings screen (full GUI uten JSON)
  */
 if (!defined('ABSPATH')) exit;
 
 class FFP_Settings {
     private $option = 'ffp_settings';
 
-    // Definer alle felt ett sted (id, label, type, choices)
     private function fields() {
-        $fields = [
-            ['store_mode',       'Butikkmodus',                        'select',   ['takeaway'=>'Takeaway','delivery'=>'Delivery','both'=>'Begge']],
-            ['order_sound',      'Lyd ved ny ordre (admin)',           'checkbox'],
-            ['onesignal_app_id', 'OneSignal App ID (valgfritt)',       'text'],
-            ['onesignal_rest_key','OneSignal REST API Key (valgfritt)','text'],
-            ['license_server',   'Lisensserver URL',                   'text'],
-            ['update_endpoint',  'Oppdaterings-endpoint (relativ)',    'text'],
-            ['license_key',      'Lisensnøkkel',                       'text'],
-            ['store_address',    'Butikkadresse (for distanse)',       'text'],
-            ['map_provider',     'Kartleverandør',                     'select',   ['mapbox'=>'Mapbox','google'=>'Google']],
-            ['mapbox_token',     'Mapbox Access Token',                'text'],
-            ['google_api_key',   'Google API Key (Geocoding)',         'text'],
-            ['enable_sse',       'Live via SSE (anbefalt)',            'checkbox'],
+        return [
+            ['store_mode',       'Butikkmodus', 'select', ['takeaway'=>'Takeaway','delivery'=>'Delivery','both'=>'Begge']],
+            ['order_sound',      'Lyd ved ny ordre (admin)', 'checkbox'],
+            ['onesignal_app_id', 'OneSignal App ID (valgfritt)', 'text'],
+            ['onesignal_rest_key','OneSignal REST API Key (valgfritt)', 'text'],
+            ['license_server',   'Lisensserver URL', 'text'],
+            ['update_endpoint',  'Oppdaterings-endpoint (relativ)', 'text'],
+            ['license_key',      'Lisensnøkkel', 'text'],
+            ['store_address',    'Butikkadresse (for distanse)', 'text'],
+            ['map_provider',     'Kartleverandør', 'select', ['mapbox'=>'Mapbox','google'=>'Google']],
+            ['mapbox_token',     'Mapbox Access Token', 'text'],
+            ['google_api_key',   'Google API Key (Geocoding)', 'text'],
+            ['enable_sse',       'Live via SSE (anbefalt)', 'checkbox'],
+            ['enable_pwa',       'Aktiver PWA', 'checkbox'],
+            ['pricing_formula',  'Prisformel', 'custom_price'],
+            ['zones',            'Soner', 'custom_zones'],
+            ['email_to',         'Varsel e-post til (kommaseparert)', 'text'],
+            ['email_subject_new','Emne: ny ordre', 'text'],
+            ['email_body_new',   'E-postmal: ny ordre', 'textarea'],
+            ['email_subject_status','Emne: statusendring', 'text'],
+            ['email_body_status','E-postmal: statusendring', 'textarea'],
+            ['webhook_url',      'Webhook URL (POST JSON)', 'text'],
         ];
-
-        // Ekstra felter
-        $fields = array_merge($fields, [
-            ['pricing_formula','Prisformel (JSON)'],
-            ['zones_json','Soner (JSON)'],
-            ['email_to','Varsel e-post til (kommaseparert)'],
-            ['email_subject_new','Emne: ny ordre'],
-            ['email_body_new','E-postmal: ny ordre'],
-            ['email_subject_status','Emne: statusendring'],
-            ['email_body_status','E-postmal: statusendring'],
-            ['webhook_url','Webhook URL (POST JSON)'],
-            ['enable_pwa','Aktiver PWA','checkbox'],
-        ]);
-
-        return $fields;
     }
 
     public function __construct() {
         add_action('admin_menu',  [$this,'menu']);
         add_action('admin_init',  [$this,'register']);
+        add_action('admin_enqueue_scripts', [$this,'enqueue_assets']);
     }
 
-    /** Legg inn meny under WooCommerce (faller tilbake til Innstillinger hvis Woo mangler) */
+    public function enqueue_assets($hook) {
+        // Sjekk at vi er på vår innstillingsside
+        if ($hook !== 'woocommerce_page_ffp_settings' && $hook !== 'settings_page_ffp_settings') {
+            return;
+        }
+
+        // JS
+        wp_enqueue_script(
+            'ffp-settings-js',
+            FFP_URL . 'assets/js/settings.js',
+            ['jquery'],
+            FFP_VERSION,
+            true
+        );
+
+        // CSS
+        wp_enqueue_style(
+            'ffp-settings-css',
+            FFP_URL . 'assets/css/settings.css',
+            [],
+            FFP_VERSION
+        );
+    }
+
     public function menu() {
         if (class_exists('WooCommerce')) {
-            add_submenu_page(
-                'woocommerce',
-                'FastFood Pro – Innstillinger',
-                'FastFood Pro',
-                'manage_options',
-                'ffp_settings',
-                [$this,'render_page']
-            );
+            add_submenu_page('woocommerce', 'FastFood Pro – Innstillinger', 'FastFood Pro', 'manage_options', 'ffp_settings', [$this,'render_page']);
         } else {
-            add_options_page(
-                'FastFood Pro – Innstillinger',
-                'FastFood Pro',
-                'manage_options',
-                'ffp_settings',
-                [$this,'render_page']
-            );
+            add_options_page('FastFood Pro – Innstillinger', 'FastFood Pro', 'manage_options', 'ffp_settings', [$this,'render_page']);
         }
     }
 
-    /** Registrer setting + seksjon + alle feltene */
     public function register() {
         register_setting('ffp_settings_group', $this->option, [$this,'sanitize']);
-        add_settings_section('ffp_main', 'FastFood Pro – Innstillinger', '__return_false', 'ffp_settings');
+        add_settings_section('ffp_main', '', '__return_false', 'ffp_settings');
 
         foreach ($this->fields() as $f) {
-            add_settings_field(
-                $f[0],
-                esc_html($f[1]),
-                [$this,'render_field'],
-                'ffp_settings',
-                'ffp_main',
-                ['id'=>$f[0], 'type'=>$f[2] ?? 'text', 'choices'=>$f[3] ?? []]
-            );
+            add_settings_field($f[0], esc_html($f[1]), [$this,'render_field'], 'ffp_settings', 'ffp_main', [
+                'id'=>$f[0],
+                'type'=>$f[2] ?? 'text',
+                'choices'=>$f[3] ?? []
+            ]);
         }
     }
 
-    /** Saniter og valider alle felter før lagring */
     public function sanitize($input) {
         $out = get_option($this->option, []);
 
-        // Defaults
-        $defs = [
-            'store_mode'       => 'both',
-            'order_sound'      => false,
-            'onesignal_app_id' => '',
-            'onesignal_rest_key' => '',
-            'license_server'   => '',
-            'update_endpoint'  => '',
-            'license_key'      => '',
-            'store_address'    => '',
-            'map_provider'     => 'mapbox',
-            'mapbox_token'     => '',
-            'google_api_key'   => '',
-            'enable_sse'       => true,
-            'enable_pwa'       => false,
-            'pricing_formula'  => ['base'=>35,'per_km'=>8,'min'=>39,'max'=>199],
-            'zones_json'       => '',
-            'email_to'         => '',
-            'email_subject_new'=> '',
-            'email_body_new'   => '',
-            'email_subject_status' => '',
-            'email_body_status'=> '',
-            'webhook_url'      => '',
-        ];
-        foreach ($defs as $k => $def) {
-            if (!isset($out[$k])) $out[$k] = $def;
-        }
-
-        // Feltdefinisjoner
-        $field_map = [];
         foreach ($this->fields() as $f) {
-            $field_map[$f[0]] = ['type'=>$f[2] ?? 'text', 'choices'=>$f[3] ?? []];
-        }
-
-        foreach ((array)$input as $k => $v) {
-            if (!isset($field_map[$k])) continue;
-            $type = $field_map[$k]['type'];
-
+            $id = $f[0];
+            $type = $f[2] ?? 'text';
             switch ($type) {
                 case 'checkbox':
-                    $out[$k] = !empty($v) ? true : false;
+                    $out[$id] = !empty($input[$id]);
                     break;
-
                 case 'select':
-                    $choices = array_keys($field_map[$k]['choices']);
-                    $v = is_string($v) ? sanitize_text_field($v) : '';
-                    $out[$k] = in_array($v, $choices, true) ? $v : $out[$k];
+                    $choices = array_keys($f[3]);
+                    $out[$id] = in_array($input[$id] ?? '', $choices, true) ? $input[$id] : ($out[$id] ?? '');
                     break;
-
-                case 'text':
-                default:
-                    if ($k === 'license_server' || $k === 'webhook_url') {
-                        $out[$k] = esc_url_raw($v);
-                    } else {
-                        $out[$k] = is_string($v) ? sanitize_text_field($v) : $out[$k];
+                case 'custom_price':
+                    $out['pricing_formula'] = [
+                        'base' => floatval($input['price_base'] ?? 0),
+                        'per_km' => floatval($input['price_per_km'] ?? 0),
+                        'min' => floatval($input['price_min'] ?? 0),
+                        'max' => floatval($input['price_max'] ?? 0),
+                    ];
+                    break;
+                case 'custom_zones':
+                    $zones = [];
+                    if (!empty($input['zone_name']) && is_array($input['zone_name'])) {
+                        foreach ($input['zone_name'] as $i => $name) {
+                            if (trim($name) === '') continue;
+                            $zones[] = [
+                                'name' => sanitize_text_field($name),
+                                'postcode_regex' => sanitize_text_field($input['zone_regex'][$i] ?? ''),
+                                'base' => floatval($input['zone_base'][$i] ?? 0),
+                                'per_km' => floatval($input['zone_per_km'][$i] ?? 0),
+                                'min' => floatval($input['zone_min'][$i] ?? 0),
+                                'max' => floatval($input['zone_max'][$i] ?? 0),
+                            ];
+                        }
                     }
+                    $out['zones'] = $zones;
+                    break;
+                default:
+                    $out[$id] = sanitize_text_field($input[$id] ?? '');
                     break;
             }
         }
-
-        // Spesial: enable_sse & enable_pwa
-        $out['enable_sse'] = !empty($input['enable_sse']);
-        $out['enable_pwa'] = !empty($input['enable_pwa']);
-
-        // Prisformel JSON eller array
-        if (empty($input['pricing_formula'])) {
-            $out['pricing_formula'] = ['base'=>35,'per_km'=>8,'min'=>39,'max'=>199];
-        } else {
-            $pf = $input['pricing_formula'];
-            if (is_string($pf)) { $pf = json_decode(wp_unslash($pf), true); }
-            if (is_array($pf)) $out['pricing_formula'] = $pf;
-        }
-
-        // Valider JSON soner
-        if (!empty($input['zones_json'])) {
-            $z = json_decode(wp_unslash($input['zones_json']), true);
-            if (json_last_error() === JSON_ERROR_NONE) {
-                $out['zones_json'] = wp_unslash($input['zones_json']);
-            }
-        }
-
-        // Autogeokod butikkadresse hvis endret
-        $old = get_option($this->option, []);
-        if (($old['store_address'] ?? '') !== ($input['store_address'] ?? '')) {
-            $geo = FFP_Geo::geocode(sanitize_text_field($input['store_address']));
-            if ($geo) {
-                $out['store_lat'] = $geo['lat'];
-                $out['store_lng'] = $geo['lng'];
-            }
-        }
-
         return $out;
     }
 
-    /** Render enkeltfelt basert på type */
     public function render_field($args) {
-        $opts    = get_option($this->option, []);
-        $id      = esc_attr($args['id']);
-        $type    = $args['type'] ?? 'text';
+        $opts = get_option($this->option, []);
+        $id = $args['id'];
+        $type = $args['type'];
         $choices = $args['choices'] ?? [];
-        $val     = $opts[$id] ?? '';
+        $val = $opts[$id] ?? '';
 
-        if (in_array($id, ['email_body_new','email_body_status'])) {
-            echo '<textarea class="large-text" rows="6" name="ffp_settings['.$id.']">'.esc_textarea($val).'</textarea>
-            <p class="description">Placeholders: {order_id} {status} {total} {customer} {address} {driver}</p>';
-
-        } elseif ($id === 'pricing_formula' || $id === 'zones_json') {
-            $pretty = is_string($val) ? $val : wp_json_encode($val, JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE);
-            echo '<textarea class="large-text code" rows="8" name="ffp_settings['.$id.']">'.esc_textarea($pretty).'</textarea>';
-            if ($id === 'pricing_formula') {
-                echo '<p class="description">Eksempel: {"base":35,"per_km":8,"min":39,"max":199}</p>';
-            } else {
-                echo '<p class="description">Eksempel sone: [{"name":"Sentrum","postcode_regex":"^40(\\d{2})$","base":29,"per_km":6,"min":39,"max":149}]</p>';
-            }
-
-        } elseif (in_array($id, ['enable_pwa','enable_sse','order_sound'])) {
-            echo '<label><input type="checkbox" name="ffp_settings['.$id.']" value="1" '.checked($val, true, false).'> Aktiv</label>';
-
-        } elseif ($type === 'select') {
-            echo '<select name="ffp_settings['.$id.']">';
-            foreach ($choices as $key => $label) {
-                echo '<option value="'.esc_attr($key).'" '.selected($val, $key, false).'>'.esc_html($label).'</option>';
-            }
-            echo '</select>';
-
-        } else {
-            echo '<input type="text" class="regular-text" name="ffp_settings['.$id.']" value="'.esc_attr(is_array($val) ? wp_json_encode($val) : $val).'">';
+        switch ($type) {
+            case 'checkbox':
+                echo '<label><input type="checkbox" name="'.$this->option.'['.$id.']" value="1" '.checked($val, true, false).'> Aktiv</label>';
+                break;
+            case 'select':
+                echo '<select name="'.$this->option.'['.$id.']">';
+                foreach ($choices as $k => $label) {
+                    echo '<option value="'.esc_attr($k).'" '.selected($val, $k, false).'>'.esc_html($label).'</option>';
+                }
+                echo '</select>';
+                break;
+            case 'textarea':
+                echo '<textarea class="large-text" rows="4" name="'.$this->option.'['.$id.']">'.esc_textarea($val).'</textarea>';
+                break;
+            case 'custom_price':
+                $pf = $opts['pricing_formula'] ?? ['base'=>35,'per_km'=>8,'min'=>39,'max'=>199];
+                echo '<label>Basepris: <input type="number" step="0.01" name="'.$this->option.'[price_base]" value="'.esc_attr($pf['base']).'"></label> ';
+                echo '<label>Pris/km: <input type="number" step="0.01" name="'.$this->option.'[price_per_km]" value="'.esc_attr($pf['per_km']).'"></label> ';
+                echo '<label>Min: <input type="number" step="0.01" name="'.$this->option.'[price_min]" value="'.esc_attr($pf['min']).'"></label> ';
+                echo '<label>Maks: <input type="number" step="0.01" name="'.$this->option.'[price_max]" value="'.esc_attr($pf['max']).'"></label>';
+                break;
+            case 'custom_zones':
+                $zones = $opts['zones'] ?? [];
+                echo '<table class="widefat ffp-zones-table"><thead><tr><th>Navn</th><th>Postnummer Regex</th><th>Base</th><th>Pris/km</th><th>Min</th><th>Maks</th><th></th></tr></thead><tbody>';
+                if (!empty($zones)) {
+                    foreach ($zones as $z) {
+                        echo '<tr>
+                            <td><input type="text" name="'.$this->option.'[zone_name][]" value="'.esc_attr($z['name']).'"></td>
+                            <td><input type="text" name="'.$this->option.'[zone_regex][]" value="'.esc_attr($z['postcode_regex']).'"></td>
+                            <td><input type="number" step="0.01" name="'.$this->option.'[zone_base][]" value="'.esc_attr($z['base']).'"></td>
+                            <td><input type="number" step="0.01" name="'.$this->option.'[zone_per_km][]" value="'.esc_attr($z['per_km']).'"></td>
+                            <td><input type="number" step="0.01" name="'.$this->option.'[zone_min][]" value="'.esc_attr($z['min']).'"></td>
+                            <td><input type="number" step="0.01" name="'.$this->option.'[zone_max][]" value="'.esc_attr($z['max']).'"></td>
+                            <td><button type="button" class="button ffp-remove-zone">X</button></td>
+                        </tr>';
+                    }
+                }
+                echo '</tbody></table>';
+                echo '<p><button type="button" class="button" id="ffp-add-zone">+ Legg til sone</button></p>';
+                break;
+            default:
+                echo '<input type="text" class="regular-text" name="'.$this->option.'['.$id.']" value="'.esc_attr($val).'">';
+                break;
         }
     }
 
-    /** Selve innstillingssiden */
     public function render_page() {
         if (!current_user_can('manage_options')) return;
-        ?>
-        <div class="wrap">
-            <h1>FastFood Pro – Innstillinger</h1>
-            <form method="post" action="options.php">
-                <?php
-                settings_fields('ffp_settings_group');
-                do_settings_sections('ffp_settings');
-                submit_button();
-                ?>
-            </form>
-        </div>
-        <?php
+        echo '<div class="wrap"><h1>FastFood Pro – Innstillinger</h1><form method="post" action="options.php">';
+        settings_fields('ffp_settings_group');
+        do_settings_sections('ffp_settings');
+        submit_button();
+        echo '</form></div>';
     }
 }

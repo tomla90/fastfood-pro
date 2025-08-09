@@ -1,0 +1,25 @@
+.ffp-zones-table th, 
+.ffp-zones-table td {
+    padding: 5px;
+}
+
+.ffp-zones-table input {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+#ffp-add-zone {
+    margin-top: 8px;
+}
+
+.ffp-remove-zone {
+    background: #dc3232;
+    color: #fff;
+    border: none;
+    padding: 0 8px;
+    cursor: pointer;
+}
+
+.ffp-remove-zone:hover {
+    background: #a00;
+}

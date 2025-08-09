@@ -1,11 +1,6 @@
 <?php
 if (!defined('ABSPATH')) exit;
 
-/**
- * Produkt-tillegg per produkt (ost, paprika, ekstra kjøtt osv.)
- * Admin: meta-boks i produkt, lagrer JSON med add-ons [ {label, price, id}, ... ]
- * Frontend: render i produkt (via hook) og i cart/checkout.
- */
 class FFP_Product_Addons {
     const META_KEY = '_ffp_addons';
 
@@ -24,11 +19,48 @@ class FFP_Product_Addons {
     }
 
     public function metabox_html($post) {
-        $val = get_post_meta($post->ID, self::META_KEY, true);
-        $json = is_string($val) && $val ? $val : '[]';
+        $addons = json_decode(get_post_meta($post->ID, self::META_KEY, true), true);
+        if (!is_array($addons)) $addons = [];
+
         wp_nonce_field('ffp_addons_save','ffp_addons_nonce');
-        echo '<p>Legg inn som JSON-array av objekter: [{"id":"cheese","label":"Ekstra ost","price":15}]</p>';
-        echo '<textarea name="ffp_addons_json" style="width:100%;height:160px;">'.esc_textarea($json).'</textarea>';
+
+        echo '<div id="ffp-addons-container">';
+        foreach ($addons as $addon) {
+            echo '<div class="ffp-addon-row">';
+            echo '<input type="text" name="ffp_addons_label[]" placeholder="Navn" value="'.esc_attr($addon['label']).'" />';
+            echo '<input type="number" step="0.01" name="ffp_addons_price[]" placeholder="Pris" value="'.esc_attr($addon['price']).'" />';
+            echo '<button type="button" class="button remove-addon">Fjern</button>';
+            echo '</div>';
+        }
+        echo '</div>';
+
+        echo '<button type="button" class="button" id="add-addon">Legg til tillegg</button>';
+
+        // Enkel JS for å legge til nye rader
+        ?>
+        <script>
+        document.addEventListener('DOMContentLoaded', function(){
+            document.getElementById('add-addon').addEventListener('click', function(){
+                let c = document.getElementById('ffp-addons-container');
+                let row = document.createElement('div');
+                row.classList.add('ffp-addon-row');
+                row.innerHTML = '<input type="text" name="ffp_addons_label[]" placeholder="Navn" /> ' +
+                                '<input type="number" step="0.01" name="ffp_addons_price[]" placeholder="Pris" /> ' +
+                                '<button type="button" class="button remove-addon">Fjern</button>';
+                c.appendChild(row);
+            });
+            document.addEventListener('click', function(e){
+                if(e.target && e.target.classList.contains('remove-addon')){
+                    e.target.closest('.ffp-addon-row').remove();
+                }
+            });
+        });
+        </script>
+        <style>
+        .ffp-addon-row { margin-bottom: 5px; }
+        .ffp-addon-row input { margin-right: 5px; }
+        </style>
+        <?php
     }
 
     public function save($post_id, $post) {
@@ -36,19 +68,29 @@ class FFP_Product_Addons {
         if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
         if ($post->post_type !== 'product') return;
 
-        $json = wp_unslash($_POST['ffp_addons_json'] ?? '');
-        // Lett validering
-        json_decode($json);
-        if (json_last_error() === JSON_ERROR_NONE) {
-            update_post_meta($post_id, self::META_KEY, $json);
+        $labels = $_POST['ffp_addons_label'] ?? [];
+        $prices = $_POST['ffp_addons_price'] ?? [];
+
+        $addons = [];
+        foreach ($labels as $i => $label) {
+            $label = sanitize_text_field($label);
+            $price = floatval($prices[$i] ?? 0);
+            if ($label !== '') {
+                $addons[] = [
+                    'id'    => sanitize_title($label),
+                    'label' => $label,
+                    'price' => $price
+                ];
+            }
         }
+
+        update_post_meta($post_id, self::META_KEY, wp_json_encode($addons));
     }
 
     public function render_addons_on_product() {
         global $product;
         if (!$product) return;
-        $json = get_post_meta($product->get_id(), self::META_KEY, true);
-        $addons = $json ? json_decode($json, true) : [];
+        $addons = json_decode(get_post_meta($product->get_id(), self::META_KEY, true), true);
         if (empty($addons)) return;
 
         echo '<div class="ffp-addons"><h4>Tillegg</h4>';
@@ -62,8 +104,7 @@ class FFP_Product_Addons {
     }
 
     public function add_addons_to_cart($cart_item_data, $product_id, $variation_id) {
-        $json = get_post_meta($product_id, self::META_KEY, true);
-        $addons = $json ? json_decode($json, true) : [];
+        $addons = json_decode(get_post_meta($product_id, self::META_KEY, true), true);
         $map = [];
         foreach ($addons as $a) $map[$a['id']] = $a;
 
@@ -73,7 +114,7 @@ class FFP_Product_Addons {
         foreach ($chosen as $id) {
             if (isset($map[$id])) {
                 $selected[] = [
-                    'id' => $id,
+                    'id'    => $id,
                     'label' => sanitize_text_field($map[$id]['label']),
                     'price' => floatval($map[$id]['price']),
                 ];
@@ -108,7 +149,7 @@ class FFP_Product_Addons {
         foreach ($cart->get_cart() as $cart_item) {
             if (!empty($cart_item['ffp_addons_extra'])) {
                 $price = $cart_item['data']->get_price();
-                $cart_item['data']->set_price( $price + floatval($cart_item['ffp_addons_extra']) );
+                $cart_item['data']->set_price($price + floatval($cart_item['ffp_addons_extra']));
             }
         }
     }

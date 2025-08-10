@@ -29,7 +29,7 @@ class FFP_Checkout {
         woocommerce_form_field('ffp_delivery_type', [
             'type'    => 'radio',
             'label'   => 'Hvordan vil du få maten?',
-            'class'   => ['form-row-wide'],
+            'class'   => ['form-row-wide', 'ffp-delivery-type'],
             'options' => [
                 'pickup'   => 'Hent selv',
                 'delivery' => 'Levering',
@@ -117,9 +117,9 @@ class FFP_Checkout {
                     '#shipping_state_field'
                 ];
                 if(type === 'pickup'){
-                    addressSelectors.forEach(sel => $(sel).hide());
+                    addressSelectors.forEach(sel => $(sel).hide().find('input, select').prop('disabled', true));
                 } else {
-                    addressSelectors.forEach(sel => $(sel).show());
+                    addressSelectors.forEach(sel => $(sel).show().find('input, select').prop('disabled', false));
                 }
             }
 
@@ -139,12 +139,29 @@ class FFP_Checkout {
         })(jQuery);
         </script>
         <style>
+            /* Tips */
             .ffp-tip-group{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;}
             .ffp-tip-pill{display:inline-flex;align-items:center;gap:8px;border:1px solid #ddd;border-radius:999px;padding:6px 12px;cursor:pointer;user-select:none;background:#fff;}
             .ffp-tip-pill input{display:none;}
             .ffp-tip-pill span{font-weight:600;font-size:.95em;}
             .ffp-tip-pill input:checked + span{color:#fff;background:#333;border-radius:999px;padding:4px 10px;}
             .ffp-tip-custom-row{display:none;}
+
+            /* Leveringsvalg styling */
+            .ffp-delivery-type .woocommerce-input-wrapper{
+                display:flex; gap:8px; flex-wrap:wrap;
+            }
+            .ffp-delivery-type .woocommerce-input-wrapper label{
+                display:flex; flex-direction:column-reverse;
+                align-items:flex-start;
+                border:1px solid #ddd; border-radius:12px;
+                padding:8px 12px;
+                background:#fff; cursor:pointer;
+            }
+            .ffp-delivery-type .woocommerce-input-wrapper label input[type="radio"]{
+                margin-top:6px;
+            }
+            .ffp-delivery-type .optional{display:none;}
         </style>
         <?php
     }
@@ -224,8 +241,8 @@ class FFP_Checkout {
         $cart->add_fee(__('Leveringsgebyr', 'fastfood-pro'), $fee, false);
     }
 
-    /** Kortkoder */
-    public function shortcode_tip(){ /* ... sammesom før ... */ }
+    /** Kortkoder (placeholder) */
+    public function shortcode_tip(){ /* ... */ }
     public function shortcode_delivery_fee(){ /* ... */ }
     public function shortcode_summary(){ /* ... */ }
     public function shortcode_track($atts){ /* ... */ }

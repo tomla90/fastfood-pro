@@ -2,11 +2,63 @@
 if (!defined('ABSPATH')) exit;
 
 class FFP_Frontend {
+
     public function __construct() {
         add_shortcode('ffp_driver_portal', [$this,'driver_portal']);
-        add_shortcode('ffp_login', [$this,'login_form']);
-        add_action('init', [$this,'handle_login']);
+        add_shortcode('ffp_login',         [$this,'login_form']);
+
+        add_action('init',                 [$this,'handle_login']);
         add_action('wp_logout', function(){ wp_safe_redirect(home_url()); exit; });
+
+        // ENQUEUE ASSETS (frontend)
+        add_action('wp_enqueue_scripts',   [$this,'enqueue_assets']);
+    }
+
+    /** Enqueue frontend CSS/JS */
+    public function enqueue_assets() {
+        // Base CSS – liten, kan lastes globalt
+        wp_enqueue_style(
+            'ffp-frontend',
+            plugins_url('../assets/styles.css', __FILE__), // __FILE__ peker på includes/, derfor ../
+            [],
+            '1.0'
+        );
+
+        // Checkout UI (tips-pill + pickup/levering)
+        if (is_checkout()) {
+            wp_enqueue_script(
+                'ffp-checkout',
+                plugins_url('../assets/js/checkout.js', __FILE__),
+                ['jquery'],
+                '1.0',
+                true
+            );
+        }
+
+        // Driver-portal: last kun hvis shortcoden er på siden
+        if ($this->is_current_page_has_shortcode('ffp_driver_portal')) {
+            wp_enqueue_script(
+                'ffp-driver',
+                plugins_url('../assets/js/driver.js', __FILE__), // lag denne om du ikke har den
+                ['jquery'],
+                '1.0',
+                true
+            );
+
+            // Pass REST-info/nonce til JS
+            wp_localize_script('ffp-driver', 'FFP_DRIVER', [
+                'rest'  => rest_url('ffp/v1'),
+                'nonce' => wp_create_nonce('wp_rest'),
+            ]);
+        }
+    }
+
+    /** Hjelper: sjekk om nåværende innhold har shortcoden */
+    private function is_current_page_has_shortcode($shortcode) {
+        if (!is_singular()) return false;
+        $post = get_post();
+        if (!$post) return false;
+        return (has_shortcode($post->post_content, $shortcode));
     }
 
     public function driver_portal() {
@@ -41,9 +93,9 @@ class FFP_Frontend {
         if (!isset($_POST['ffp_login_nonce']) || !wp_verify_nonce($_POST['ffp_login_nonce'],'ffp_login')) return;
 
         $creds = [
-            'user_login' => sanitize_text_field($_POST['log']),
+            'user_login'    => sanitize_text_field($_POST['log']),
             'user_password' => $_POST['pwd'],
-            'remember' => true
+            'remember'      => true
         ];
         $user = wp_signon($creds, false);
         if (is_wp_error($user)) {

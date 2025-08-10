@@ -6,3 +6,35 @@
 .ffp-login input {width:100%}
 .ffp-driver-actions {display:flex;gap:8px;margin-bottom:8px}
 .ffp-map { width:100%; background:#f9fafb }
+
+
+/* --- Checkout: Tips pill-knapper + compact rows --- */
+.ffp-tip-group{
+  display:flex; flex-wrap:wrap; gap:8px; margin:6px 0 10px;
+}
+.ffp-tip-pill{
+  display:inline-flex; align-items:center; gap:8px;
+  border:1px solid #ddd; border-radius:999px; padding:6px 12px;
+  cursor:pointer; user-select:none; background:#fff;
+}
+.ffp-tip-pill input{ display:none; }
+.ffp-tip-pill span{ font-weight:600; font-size:.95em; }
+.ffp-tip-pill input:checked + span{
+  color:#fff; background:#333; border-radius:999px; padding:4px 10px;
+}
+
+/* Egendefinert tips-felt skjult som default (vises av JS ved valg) */
+.ffp-tip-custom-row{ display:none; }
+
+/* Addons-boksen kompakt og pen */
+.ffp-addons{
+  margin:12px 0; padding:14px; border:1px dashed #e6e0d8;
+  border-radius:12px; background:rgba(0,0,0,.02);
+}
+.ffp-addon-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:6px 0; border-bottom:1px solid #eee; }
+.ffp-addon-row:last-child{ border-bottom:0; }
+.ffp-addon-price{ font-size:.85em; font-weight:500; opacity:.75; white-space:nowrap; }
+
+/* Breakdance cart-form kan bruke flex – sørg for full bredde */
+.woocommerce div.product form.cart > .ffp-addons{ flex-basis:100%; }
+

@@ -87,21 +87,27 @@ class FFP_Product_Addons {
         update_post_meta($post_id, self::META_KEY, wp_json_encode($addons));
     }
 
-    public function render_addons_on_product() {
-        global $product;
-        if (!$product) return;
-        $addons = json_decode(get_post_meta($product->get_id(), self::META_KEY, true), true);
-        if (empty($addons)) return;
+  public function render_addons_on_product() {
+    global $product;
+    if (!$product) return;
 
-        echo '<div class="ffp-addons"><h4>Tillegg</h4>';
-        foreach ($addons as $a) {
-            $id = esc_attr($a['id']);
-            $label = esc_html($a['label']);
-            $price = floatval($a['price']);
-            echo '<label class="ffp-addon-row"><input type="checkbox" name="ffp_addons[]" value="'.$id.'" data-price="'.$price.'"> '.$label.' ('.wc_price($price).')</label>';
-        }
-        echo '</div>';
+    $addons = json_decode(get_post_meta($product->get_id(), self::META_KEY, true), true);
+    if (empty($addons)) return;
+
+    echo '<div class="ffp-addons"><h4>Tillegg</h4>';
+    foreach ($addons as $a) {
+        $id    = esc_attr($a['id']);
+        $label = esc_html($a['label']);
+        $price = floatval($a['price']);
+
+        echo '<label class="ffp-addon-row">';
+        echo '  <input type="checkbox" name="ffp_addons[]" value="'.$id.'" data-price="'.$price.'"> ';
+        echo '  <span class="ffp-addon-label">'.$label.'</span>';
+        echo '  <span class="ffp-addon-price">'.wc_price($price).'</span>';
+        echo '</label>';
     }
+    echo '</div>';
+}
 
     public function add_addons_to_cart($cart_item_data, $product_id, $variation_id) {
         $addons = json_decode(get_post_meta($product_id, self::META_KEY, true), true);

@@ -1,4 +1,6 @@
-// FastFood Pro - Settings UI helpers (zones + validation)
+/**
+ * FastFood Pro - Admin Settings UI (Zones + Validation)
+ */
 jQuery(function ($) {
   const optName = "ffp_settings";
   const $form = $('form[action="options.php"]').first();
@@ -6,6 +8,7 @@ jQuery(function ($) {
   const $tbody = $zonesTable.find("tbody");
   const addBtnSel = "#ffp-add-zone";
 
+  /** Escape helpers **/
   function escapeHtml(s) {
     return String(s == null ? "" : s)
       .replace(/&/g, "&amp;")
@@ -17,6 +20,7 @@ jQuery(function ($) {
     return s == null ? "" : String(s);
   }
 
+  /** HTML-template for rad **/
   function zoneRowTpl(values) {
     const v = Object.assign(
       { name: "", regex: "", base: "", per_km: "", min: "", max: "" },
@@ -46,54 +50,27 @@ jQuery(function ($) {
     `;
   }
 
-  function readRow($row) {
-    return {
-      name: $row.find(`input[name="${optName}[zone_name][]"]`).val()?.trim() || "",
-      regex: $row.find(`input[name="${optName}[zone_regex][]"]`).val()?.trim() || "",
-      base: $row.find(`input[name="${optName}[zone_base][]"]`).val(),
-      per_km: $row.find(`input[name="${optName}[zone_per_km][]"]`).val(),
-      min: $row.find(`input[name="${optName}[zone_min][]"]`).val(),
-      max: $row.find(`input[name="${optName}[zone_max][]"]`).val(),
-    };
-  }
-
-  function focusLastRowFirstInput() {
-    const $last = $tbody.find("tr").last();
-    $last.find(`input[name="${optName}[zone_name][]"]`).trigger("focus");
-  }
-
-  function labelOf(key) {
-    switch (key) {
-      case "base": return "Base";
-      case "per_km": return "Pris/km";
-      case "min": return "Min";
-      case "max": return "Maks";
-      default: return key;
-    }
-  }
-
-  // Legg til ny sone
+  /** Legg til ny sone **/
   $(document).on("click", addBtnSel, function (e) {
     e.preventDefault();
     $tbody.append(zoneRowTpl());
     focusLastRowFirstInput();
   });
 
-  // Fjern sone
+  /** Fjern sone **/
   $(document).on("click", ".ffp-remove-zone", function (e) {
     e.preventDefault();
     $(this).closest("tr").remove();
   });
 
-  // Dupliser sone
+  /** Dupliser sone **/
   $(document).on("click", ".ffp-dup-zone", function (e) {
     e.preventDefault();
-    const $row = $(this).closest("tr");
-    const vals = readRow($row);
-    $row.after(zoneRowTpl(vals));
+    const vals = readRow($(this).closest("tr"));
+    $(this).closest("tr").after(zoneRowTpl(vals));
   });
 
-  // Flytt opp/ned
+  /** Flytt opp/ned **/
   $(document).on("click", ".ffp-move-up", function (e) {
     e.preventDefault();
     const $row = $(this).closest("tr");
@@ -107,40 +84,48 @@ jQuery(function ($) {
     if ($next.length) $row.insertAfter($next);
   });
 
-  // Enter i siste felt (Maks) => legg til ny rad
-  $(document).on("keydown", `.ffp-zone-row input[name^="${optName}[zone_max]"]`, function (e) {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      $(addBtnSel).trigger("click");
+  /** Enter i siste felt (Maks) => legg til ny rad **/
+  $(document).on(
+    "keydown",
+    `.ffp-zone-row input[name^="${optName}[zone_max]"]`,
+    function (e) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        $(addBtnSel).trigger("click");
+      }
     }
-  });
+  );
 
-  // Live regex test
-  $(document).on("input", `.ffp-zone-regex .ffp-regex-test, .ffp-zone-regex input[name^='${optName}[zone_regex]']`, function () {
-    const $wrap = $(this).closest(".ffp-zone-regex");
-    const pattern = $wrap.find(`input[name^='${optName}[zone_regex]']`).val().trim();
-    const probe = $wrap.find(".ffp-regex-test").val().trim();
-    const $out = $wrap.find(".ffp-test-result");
+  /** Live regex test **/
+  $(document).on(
+    "input",
+    `.ffp-zone-regex .ffp-regex-test, .ffp-zone-regex input[name^='${optName}[zone_regex]']`,
+    function () {
+      const $wrap = $(this).closest(".ffp-zone-regex");
+      const pattern = $wrap.find(`input[name^='${optName}[zone_regex]']`).val().trim();
+      const probe = $wrap.find(".ffp-regex-test").val().trim();
+      const $out = $wrap.find(".ffp-test-result");
 
-    if (!pattern || !probe) {
-      $out.text("");
-      return;
+      if (!pattern || !probe) {
+        $out.text("");
+        return;
+      }
+      try {
+        const re = new RegExp(pattern);
+        const ok = re.test(probe);
+        $out.text(ok ? "✔" : "✖").css("color", ok ? "#008a00" : "#cc0000");
+      } catch (err) {
+        $out.text("!").css("color", "#cc0000").attr("title", "Ugyldig regex");
+      }
     }
-    try {
-      const re = new RegExp(pattern);
-      const ok = re.test(probe);
-      $out.text(ok ? "✔" : "✖").css("color", ok ? "#008a00" : "#cc0000");
-    } catch (err) {
-      $out.text("!").css("color", "#cc0000").attr("title", "Ugyldig regex");
-    }
-  });
+  );
 
-  // Trim input på blur
+  /** Trim tekstfelt ved blur **/
   $(document).on("blur", ".ffp-zones-table input[type='text']", function () {
     this.value = this.value.trim();
   });
 
-  // Validering før lagring
+  /** Validering før lagring **/
   $form.on("submit", function (e) {
     const errors = [];
     let rowIndex = 0;
@@ -164,8 +149,11 @@ jQuery(function ($) {
       }
 
       if (v.regex) {
-        try { new RegExp(v.regex); }
-        catch { errors.push(`Rad ${rowIndex}: Ugyldig regex.`); }
+        try {
+          new RegExp(v.regex);
+        } catch (err) {
+          errors.push(`Rad ${rowIndex}: Ugyldig regex.`);
+        }
       }
     });
 
@@ -174,4 +162,29 @@ jQuery(function ($) {
       alert("Kan ikke lagre:\n\n" + errors.join("\n"));
     }
   });
+
+  /** Hjelpefunksjoner **/
+  function readRow($row) {
+    return {
+      name: $row.find(`input[name="${optName}[zone_name][]"]`).val()?.trim() || "",
+      regex: $row.find(`input[name="${optName}[zone_regex][]"]`).val()?.trim() || "",
+      base: $row.find(`input[name="${optName}[zone_base][]"]`).val(),
+      per_km: $row.find(`input[name="${optName}[zone_per_km][]"]`).val(),
+      min: $row.find(`input[name="${optName}[zone_min][]"]`).val(),
+      max: $row.find(`input[name="${optName}[zone_max][]"]`).val(),
+    };
+  }
+
+  function focusLastRowFirstInput() {
+    $tbody.find("tr").last().find(`input[name="${optName}[zone_name][]"]`).trigger("focus");
+  }
+
+  function labelOf(key) {
+    return {
+      base: "Base",
+      per_km: "Pris/km",
+      min: "Min",
+      max: "Maks",
+    }[key] || key;
+  }
 });

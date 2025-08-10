@@ -4,7 +4,8 @@ if (!defined('ABSPATH')) exit;
 class FFP_Admin_Menu {
     public function __construct() {
         add_action('admin_menu', [$this,'menu']);
-        add_action('admin_enqueue_scripts', [$this,'enqueue_assets']); // <- Ny hook
+        add_action('admin_enqueue_scripts', [$this,'enqueue_admin_assets']);
+        add_action('wp_enqueue_scripts', [$this,'enqueue_frontend_assets']);
     }
 
     public function menu() {
@@ -30,22 +31,20 @@ class FFP_Admin_Menu {
         add_submenu_page('ffp-orders', 'Lisens', 'Lisens', 'manage_fastfood', 'ffp-licensing', [$this,'render_licensing_page']);
     }
 
-    public function enqueue_assets($hook) {
-        // Last kun på vår innstillingsside
+    public function enqueue_admin_assets($hook) {
+        // Kun på innstillingssiden i admin
         if (!isset($_GET['page']) || $_GET['page'] !== 'ffp-settings') {
             return;
         }
 
-        // JS
         wp_enqueue_script(
             'ffp-settings',
-            FFP_URL . 'admin/js/settings.js',
+            FFP_URL . 'assets/js/settings.js',
             ['jquery'],
             FFP_VERSION,
             true
         );
 
-        // CSS
         wp_enqueue_style(
             'ffp-settings',
             FFP_URL . 'assets/css/settings.css',
@@ -54,10 +53,25 @@ class FFP_Admin_Menu {
         );
     }
 
+    public function enqueue_frontend_assets() {
+        // Hvis du bare skal laste settings.js på spesifikke sider i frontend,
+        // kan du legge inn en betingelse her. Nå lastes den overalt i frontend.
+        wp_enqueue_script(
+            'ffp-settings',
+            FFP_URL . 'assets/js/settings.js',
+            ['jquery'],
+            FFP_VERSION,
+            true
+        );
+    }
+
     private function view($file) {
         $path = FFP_DIR . 'admin/views/' . $file;
-        if (file_exists($path)) { include $path; }
-        else { echo '<div class="wrap"><h1>Mangler view: '.esc_html($file).'</h1></div>'; }
+        if (file_exists($path)) {
+            include $path;
+        } else {
+            echo '<div class="wrap"><h1>Mangler view: '.esc_html($file).'</h1></div>';
+        }
     }
 
     public function render_orders_page() {

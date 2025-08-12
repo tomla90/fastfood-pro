@@ -8,7 +8,9 @@ class FFP_REST {
 
     private static function is_driver_role(): bool {
         $u = wp_get_current_user();
-        return $u && is_user_logged_in() && in_array('ffp_driver', (array) $u->roles, true);
+        $roles = (array) ($u ? $u->roles : []);
+        // Back-compat: driver eller ffp_driver
+        return is_user_logged_in() && (in_array('ffp_driver', $roles, true) || in_array('driver', $roles, true));
     }
 
     public function routes() {
@@ -37,7 +39,7 @@ class FFP_REST {
                     'description' => 'Max number of orders (1-100)',
                     'type'        => 'integer',
                     'required'    => false,
-                    'validate_callback' => function($v){ return (int)$v > 0 && (int)$v <= 100; },
+                    'validate_callback' => function($v){ $v=(int)$v; return $v>0 && $v<=100; },
                 ],
             ],
             'callback' => function (WP_REST_Request $req) {
@@ -89,7 +91,6 @@ class FFP_REST {
             'callback' => function (WP_REST_Request $req) {
                 $addr = sanitize_text_field($req->get_param('address'));
                 if (!$addr) return new WP_Error('bad_request', 'Missing address', ['status'=>400]);
-                // NB: riktig metodenavn
                 $g = FFP_Geo::geocode($addr);
                 return $g ?: new WP_Error('geo_fail', 'Geocode failed', ['status'=>500]);
             }
@@ -107,7 +108,7 @@ class FFP_REST {
             return new WP_Error('ffp_bad_status', 'Invalid status', ['status'=>400]);
         }
 
-        $order->update_status($status, 'FFP admin changed status');
+        $order->update_status($status, 'FFP admin/driver changed status');
         return ['ok'=>true, 'id'=>$id, 'status'=>$status];
     }
 
@@ -126,6 +127,7 @@ class FFP_REST {
 
         $order->update_meta_data('_ffp_driver_id', $uid);
         $order->save();
+
         return ['ok'=>true, 'id'=>$id, 'driver'=>$uid];
     }
 }

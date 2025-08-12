@@ -1,117 +1,64 @@
-(function($){
-  function mapHTML(id){ 
-    return `<div id="map-${id}" class="ffp-map" style="height:240px;margin-top:8px;border-radius:12px;"></div>`; 
-  }
+/* global ffpDriver, jQuery */
+jQuery(function ($) {
+  if (!window.ffpDriver) return;
 
-  function row(o){
-    const items = (o.items||[]).map(i=>`<li>${i}</li>`).join('');
-    const claimBtn = o.driver_id ? '' : `<button class="button ffp-claim" data-id="${o.id}">Ta oppdrag</button>`;
-    const deliverBtn = `
-      <button class="button ffp-status" data-id="${o.id}" data-s="ffp-out-for-delivery">På vei</button>
-      <button class="button button-primary ffp-status" data-id="${o.id}" data-s="completed">Levert</button>
-    `;
+  const REST = (p) => ffpDriver.restUrl.replace(/\/$/, '') + p;
+  const HEAD = (xhr) => xhr.setRequestHeader('X-WP-Nonce', ffpDriver.nonce);
+
+  // Statuser sjåfør skal se
+  const ACTIVE = 'pending,on-hold,processing,ffp-preparing,ffp-ready,ffp-out-for-delivery';
+
+  function row(o) {
+    const mine = o.mine ? ' (min)' : (o.claimed ? ' (tildelt)' : '');
     return `
-      <div class="ffp-order" data-oid="${o.id}" data-addr="${(o.shipping_address||'').replace(/"/g,'&quot;')}">
-        <div class="ffp-order-head"><strong>#${o.id}</strong> – ${o.status} – ETA: ${o.ffp_eta||'-'} min</div>
-        <div>${o.shipping_address||''}</div>
-        <ul>${items}</ul>
-        <div class="ffp-driver-buttons">${claimBtn} ${deliverBtn}</div>
-        ${FFP_DRIVER.map && FFP_DRIVER.map.provider==='mapbox' && FFP_DRIVER.map.mapbox_token ? mapHTML(o.id) : ''}
+      <div class="ffp-order">
+        <div class="ffp-order-head"><strong>#${o.id}</strong> – ${o.status}${mine}</div>
+        <div class="ffp-driver-actions">
+          ${o.claimed ? '' : `<button class="button ffp-claim" data-id="${o.id}">Ta ordre</button>`}
+          <button class="button ffp-status" data-id="${o.id}" data-status="ffp-out-for-delivery">Ut for levering</button>
+          <button class="button button-primary ffp-status" data-id="${o.id}" data-status="completed">Fullført</button>
+        </div>
       </div>
     `;
   }
 
-  function render(list){
-    $('#ffp-driver-list').html((list||[]).map(row).join('') || '<p>Ingen tilgjengelige oppdrag.</p>');
-    bind(); 
-    initMaps();
+  function render(list) {
+    const html = (Array.isArray(list) ? list : []).map(row).join('') || '<p>Ingen aktive ordre.</p>';
+    $('#ffp-driver-app').html(html);
   }
 
-  function load(){
-    $.get({
-      url: FFP_DRIVER.rest + '/orders',
-      beforeSend: x => x.setRequestHeader('X-WP-Nonce', FFP_DRIVER.nonce)
-    }).done(render);
-  }
-
-  function bind(){
-    $('#ffp-refresh').off('click').on('click', load);
-
-    $('.ffp-claim').off('click').on('click', function(){
-      const id = $(this).data('id');
-      $.post({ 
-        url: FFP_DRIVER.rest + '/orders/' + id + '/claim', 
-        beforeSend: x => x.setRequestHeader('X-WP-Nonce', FFP_DRIVER.nonce) 
-      }).done(load);
-    });
-
-    $('.ffp-status').off('click').on('click', function(){
-      const id = $(this).data('id'), s = $(this).data('s');
-      $.post({ 
-        url: FFP_DRIVER.rest + '/orders/' + id + '/status', 
-        data: {status: s}, 
-        beforeSend: x => x.setRequestHeader('X-WP-Nonce', FFP_DRIVER.nonce) 
-      }).done(load);
+  function load() {
+    return $.get({
+      url: REST('/ffp/v1/orders') + '?status=' + encodeURIComponent(ACTIVE) + '&limit=40',
+      beforeSend: HEAD
+    }).done(render).fail((xhr) => {
+      console.error('Driver GET failed', xhr?.responseText || xhr);
+      $('#ffp-driver-app').html('<p><em>Klarte ikke å hente ordre.</em></p>');
     });
   }
 
-  function initMaps(){
-    if (!(FFP_DRIVER.map && FFP_DRIVER.map.provider==='mapbox' && FFP_DRIVER.map.mapbox_token && window.mapboxgl)) return;
-    mapboxgl.accessToken = FFP_DRIVER.map.mapbox_token;
-
-    $('.ffp-order[data-oid]').each(function(){
-      const $box = $(this), oid = $box.data('oid'), addr = $box.data('addr');
-      const el = document.getElementById('map-' + oid); 
-      if (!el) return;
-
-      // Geocode via REST
-      $.get({
-        url: FFP_DRIVER.rest + '/geo',
-        data: {address: addr},
-        beforeSend: x => x.setRequestHeader('X-WP-Nonce', FFP_DRIVER.nonce)
-      }).done(function(geo){
-        if (!geo || !geo.lng || !geo.lat) return;
-
-        const store = FFP_DRIVER.map.store || {lat: 0, lng: 0};
-        const map = new mapboxgl.Map({ 
-          container: el, 
-          style: 'mapbox://styles/mapbox/streets-v11', 
-          center: [store.lng || 0, store.lat || 0], 
-          zoom: 10 
-        });
-
-        new mapboxgl.Marker().setLngLat([store.lng, store.lat]).addTo(map);
-        new mapboxgl.Marker().setLngLat([geo.lng, geo.lat]).addTo(map);
-
-        // Fit bounds
-        const b = new mapboxgl.LngLatBounds();
-        b.extend([store.lng, store.lat]); 
-        b.extend([geo.lng, geo.lat]);
-        map.fitBounds(b, {padding: 30});
-
-        // Draw straight line
-        map.on('load', function(){
-          map.addSource('route-' + oid, {
-            'type': 'geojson',
-            'data': {
-              'type': 'Feature',
-              'geometry': { 'type': 'LineString', 'coordinates': [[store.lng, store.lat],[geo.lng, geo.lat]] }
-            }
-          });
-          map.addLayer({
-            'id': 'route-' + oid,
-            'type': 'line',
-            'source': 'route-' + oid,
-            'layout': {'line-join':'round','line-cap':'round'},
-            'paint': {'line-width': 4}
-          });
-        });
-      });
+  $(document).on('click', '.ffp-claim', function () {
+    const id = $(this).data('id');
+    $.post({
+      url: REST('/ffp/v1/orders/' + id + '/claim'),
+      beforeSend: HEAD
+    }).done(load).fail((xhr) => {
+      alert('Kunne ikke ta ordren: ' + (xhr?.responseJSON?.message || 'Ukjent feil'));
     });
-  }
-
-  $(function(){
-    if ($('#ffp-driver-app').length) load();
   });
 
-})(jQuery);
+  $(document).on('click', '.ffp-status', function () {
+    const id = $(this).data('id');
+    const s  = $(this).data('status');
+    $.post({
+      url: REST('/ffp/v1/orders/' + id + '/status'),
+      data: { status: s },
+      beforeSend: HEAD
+    }).done(load).fail((xhr) => {
+      alert('Kunne ikke oppdatere status: ' + (xhr?.responseJSON?.message || 'Ukjent feil'));
+    });
+  });
+
+  function poll(){ load().always(() => setTimeout(poll, 7000)); }
+  load(); poll();
+});

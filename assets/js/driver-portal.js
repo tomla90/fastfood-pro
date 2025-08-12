@@ -1,3 +1,4 @@
+console.log('Driver portal boot', window.ffpDriver);
 /* global ffpDriver, jQuery */
 jQuery(function ($) {
   if (!window.ffpDriver) return;
@@ -6,7 +7,8 @@ jQuery(function ($) {
   const HEAD = (xhr) => xhr.setRequestHeader('X-WP-Nonce', ffpDriver.nonce);
 
   // Statuser sjåfør skal se
-  const ACTIVE = 'pending,on-hold,processing,ffp-preparing,ffp-ready,ffp-out-for-delivery';
+  const ACTIVE =
+    'pending,on-hold,processing,ffp-preparing,ffp-ready,ffp-out-for-delivery';
 
   // Pene labels for visning
   const LABELS = {
@@ -17,7 +19,7 @@ jQuery(function ($) {
     'ffp-ready': 'Klar til henting',
     'ffp-out-for-delivery': 'Ut for levering',
     completed: 'Fullført',
-    cancelled: 'Kansellert'
+    cancelled: 'Kansellert',
   };
 
   // Hold orden på hva vi allerede har vist (for “blink” ved nye ordre)
@@ -40,7 +42,7 @@ jQuery(function ($) {
 
   function row(o) {
     const statusLabel = LABELS[o.status] || o.status;
-    const mine = o.mine ? ' (min)' : (o.claimed ? ' (tildelt)' : '');
+    const mine = o.mine ? ' (min)' : o.claimed ? ' (tildelt)' : '';
     const claimedOrMine = o.claimed || o.mine;
 
     return `
@@ -49,9 +51,17 @@ jQuery(function ($) {
           <strong>#${o.id}</strong> – ${statusLabel}${mine}
         </div>
         <div class="ffp-driver-actions">
-          ${claimedOrMine ? '' : `<button class="button ffp-claim" data-id="${o.id}">Ta ordre</button>`}
-          <button class="button ffp-status" data-id="${o.id}" data-status="ffp-out-for-delivery">Ut for levering</button>
-          <button class="button button-primary ffp-status" data-id="${o.id}" data-status="completed">Fullført</button>
+          ${
+            claimedOrMine
+              ? ''
+              : `<button class="button ffp-claim" data-id="${o.id}">Ta ordre</button>`
+          }
+          <button class="button ffp-status" data-id="${
+            o.id
+          }" data-status="ffp-out-for-delivery">Ut for levering</button>
+          <button class="button button-primary ffp-status" data-id="${
+            o.id
+          }" data-status="completed">Fullført</button>
         </div>
       </div>
     `;
@@ -63,7 +73,7 @@ jQuery(function ($) {
     $('#ffp-driver-app').html(html);
 
     // Marker nye ordre én gang
-    arr.forEach(o => {
+    arr.forEach((o) => {
       if (!seenIds.has(String(o.id))) {
         const $el = $(`.ffp-order[data-id="${o.id}"]`);
         $el.addClass('ffp-new');
@@ -72,17 +82,23 @@ jQuery(function ($) {
       }
     });
     // Oppdater “sett”
-    seenIds = new Set(arr.map(o => String(o.id)));
+    seenIds = new Set(arr.map((o) => String(o.id)));
   }
 
   function load() {
     return $.get({
-      url: REST('/ffp/v1/orders') + '?status=' + encodeURIComponent(ACTIVE) + '&limit=40',
-      beforeSend: HEAD
-    }).done(render).fail((xhr) => {
-      console.error('Driver GET failed', xhr?.responseText || xhr);
-      $('#ffp-driver-app').html('<p><em>Klarte ikke å hente ordre.</em></p>');
-    });
+      url:
+        REST('/ffp/v1/orders') +
+        '?status=' +
+        encodeURIComponent(ACTIVE) +
+        '&limit=40',
+      beforeSend: HEAD,
+    })
+      .done(render)
+      .fail((xhr) => {
+        console.error('Driver GET failed', xhr?.responseText || xhr);
+        $('#ffp-driver-app').html('<p><em>Klarte ikke å hente ordre.</em></p>');
+      });
   }
 
   // Claim order
@@ -90,25 +106,38 @@ jQuery(function ($) {
     const id = $(this).data('id');
     $.post({
       url: REST('/ffp/v1/orders/' + id + '/claim'),
-      beforeSend: HEAD
-    }).done(load).fail((xhr) => {
-      alert('Kunne ikke ta ordren: ' + (xhr?.responseJSON?.message || 'Ukjent feil'));
-    });
+      beforeSend: HEAD,
+    })
+      .done(load)
+      .fail((xhr) => {
+        alert(
+          'Kunne ikke ta ordren: ' +
+            (xhr?.responseJSON?.message || 'Ukjent feil')
+        );
+      });
   });
 
   // Update status
   $(document).on('click', '.ffp-status', function () {
     const id = $(this).data('id');
-    const s  = $(this).data('status');
+    const s = $(this).data('status');
     $.post({
       url: REST('/ffp/v1/orders/' + id + '/status'),
       data: { status: s },
-      beforeSend: HEAD
-    }).done(load).fail((xhr) => {
-      alert('Kunne ikke oppdatere status: ' + (xhr?.responseJSON?.message || 'Ukjent feil'));
-    });
+      beforeSend: HEAD,
+    })
+      .done(load)
+      .fail((xhr) => {
+        alert(
+          'Kunne ikke oppdatere status: ' +
+            (xhr?.responseJSON?.message || 'Ukjent feil')
+        );
+      });
   });
 
-  function poll(){ load().always(() => setTimeout(poll, 7000)); }
-  load(); poll();
+  function poll() {
+    load().always(() => setTimeout(poll, 7000));
+  }
+  load();
+  poll();
 });

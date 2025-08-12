@@ -1,23 +1,47 @@
+/* global ffpOrders */
 (function ($) {
+  console.log('FFP Orders JS loaded', window.ffpOrders);
+
   const restUrl = (window.ffpOrders && window.ffpOrders.restUrl) || (window.location.origin + '/wp-json');
   const nonce   = (window.ffpOrders && window.ffpOrders.nonce)   || '';
   const soundOn = !!(window.ffpOrders && window.ffpOrders.sound);
-
   const ORDERS_URL = restUrl.replace(/\/$/, '') + '/ffp/v1/orders';
 
-  let lastMaxId = 0;       // For å sjekke nye ordre
-  let muteOnce = false;    // For å unngå pip rett etter status-klikking
+  const STATUS_LABELS = {
+    'pending': 'Pending',
+    'on-hold': 'On hold',
+    'processing': 'Processing',
+    'ffp-preparing': 'Preparing',
+    'ffp-ready': 'Ready',
+    'ffp-out-for-delivery': 'Out for delivery',
+    'completed': 'Completed',
+    'cancelled': 'Cancelled',
+    'refunded': 'Refunded',
+    'failed': 'Failed',
+  };
+
+  let lastMaxId = 0;
+  let muteOnce  = false;
+
+  function btn(label, id, s, current) {
+    const active = current === s;
+    const cls = 'button' + (active ? ' button-primary' : '');
+    const dis = active ? ' disabled aria-disabled="true"' : '';
+    return `<button data-id="${id}" data-s="${s}" class="${cls}"${dis}>${label}</button>`;
+  }
 
   function row(o) {
     const items = Array.isArray(o.items) ? o.items : [];
     const li = items.map(i => `<li>${i}</li>`).join('');
+    const label = STATUS_LABELS[o.status] || o.status || '';
+
     return `<div class="ffp-order">
       <div class="ffp-order-head">
-        <strong>#${o.id ?? ''}</strong> – ${o.status ?? ''} – ${o.total ?? ''} ${o.currency ?? ''}
-        <button data-id="${o.id}" data-s="ffp-preparing" class="button">Preparing</button>
-        <button data-id="${o.id}" data-s="ffp-ready" class="button">Ready</button>
-        <button data-id="${o.id}" data-s="ffp-out-for-delivery" class="button">Out for delivery</button>
-        <button data-id="${o.id}" data-s="completed" class="button button-primary">Complete</button>
+        <strong>#${o.id ?? ''}</strong> – <span class="ffp-status">${label}</span> – ${o.total ?? ''} ${o.currency ?? ''}
+        ${btn('Preparing', o.id, 'ffp-preparing', o.status)}
+        ${btn('Ready', o.id, 'ffp-ready', o.status)}
+        ${btn('Out for delivery', o.id, 'ffp-out-for-delivery', o.status)}
+        ${btn('Complete', o.id, 'completed', o.status)}
       </div>
       <div><em>${o.billing_name || 'Ukjent kunde'}</em> – ${o.shipping_address || ''}</div>
       <ul>${li}</ul>
@@ -30,16 +54,14 @@
     const html = arr.map(row).join('');
     $('#ffp-orders-app').html(html || '<p>Ingen åpne ordre.</p>');
 
-    // Sjekk for nye ordre og spill lyd om aktivert
     if (soundOn && arr.length) {
       const maxId = arr.reduce((m, o) => Math.max(m, Number(o.id || 0)), 0);
       if (!muteOnce && maxId > lastMaxId) {
-        try { new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg').play(); } catch(e) {}
+        try { new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg').play(); } catch(e){}
       }
       lastMaxId = Math.max(lastMaxId, maxId);
     }
-
-    muteOnce = false; // Tilbakestill mute etter én oppdatering
+    muteOnce = false;
     bind();
   }
 
@@ -48,6 +70,11 @@
       url: ORDERS_URL + '?status=pending,on-hold,processing,ffp-preparing,ffp-ready,ffp-out-for-delivery&limit=30',
       beforeSend: x => x.setRequestHeader('X-WP-Nonce', nonce)
     }).done(render).fail((xhr) => {
+      const body = xhr && xhr.responseJSON;
+      if (body && body.code === 'rest_cookie_invalid_nonce') {
+        $('#ffp-orders-app').html('<p><em>Sesjonen er utløpt – oppdater siden.</em></p>');
+        return;
+      }
       console.error('FFP orders GET failed', xhr?.responseText || xhr);
       $('#ffp-orders-app').html('<p><em>Klarte ikke å hente ordre.</em></p>');
     });
@@ -55,8 +82,9 @@
 
   function bind() {
     $('#ffp-orders-app .button').off('click').on('click', function () {
+      if (this.hasAttribute('disabled')) return;
       const id = $(this).data('id'), s = $(this).data('s');
-      muteOnce = true; // Ikke pip etter statusendring
+      muteOnce = true;
       $.post({
         url: ORDERS_URL + '/' + id + '/status',
         data: { status: s },

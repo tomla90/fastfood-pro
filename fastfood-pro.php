@@ -54,21 +54,14 @@ function ffp_bootstrap() {
     }
 
     // Alltid registrer statusene slik at knapper/JS fungerer
-    if (class_exists('FFP_Statuses')) {
-        new FFP_Statuses();
-    }
+    if (class_exists('FFP_Statuses'))   new FFP_Statuses();
 
     // Sørg for at REST alltid er registrert
-    if (class_exists('FFP_REST')) {
-        new FFP_REST();
-    }
+    if (class_exists('FFP_REST'))       new FFP_REST();
 
-    // Driver-portal: kun hvis ikke aggregator allerede har lagt til shortcoden
-    add_action('init', function () {
-        if (!shortcode_exists('ffp_driver_portal') && class_exists('FFP_Driver')) {
-            new FFP_Driver();
-        }
-    });
+
+    // Driver-portal – trygt å instansiere alltid; enqueuer kun når shortcoden finnes
+    if (class_exists('FFP_Driver'))     new FFP_Driver();
 }
 add_action('plugins_loaded', 'ffp_bootstrap');
 

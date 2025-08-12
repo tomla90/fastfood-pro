@@ -8,13 +8,48 @@ jQuery(function ($) {
   // Statuser sjåfør skal se
   const ACTIVE = 'pending,on-hold,processing,ffp-preparing,ffp-ready,ffp-out-for-delivery';
 
+  // Pene labels for visning
+  const LABELS = {
+    pending: 'Avventer',
+    'on-hold': 'På vent',
+    processing: 'Under behandling',
+    'ffp-preparing': 'Tilberedes',
+    'ffp-ready': 'Klar til henting',
+    'ffp-out-for-delivery': 'Ut for levering',
+    completed: 'Fullført',
+    cancelled: 'Kansellert'
+  };
+
+  // Hold orden på hva vi allerede har vist (for “blink” ved nye ordre)
+  let seenIds = new Set();
+
+  // Lite inline style for blink
+  const blinkCssId = 'ffp-driver-blink-style';
+  if (!document.getElementById(blinkCssId)) {
+    const style = document.createElement('style');
+    style.id = blinkCssId;
+    style.textContent = `
+      .ffp-order.ffp-new { animation: ffpBlink 1.4s ease-out 1; }
+      @keyframes ffpBlink {
+        0% { box-shadow: 0 0 0 rgba(34,197,94,0); background:#eafff2; }
+        100% { box-shadow: 0 0 0 rgba(34,197,94,0); background:#fff; }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
   function row(o) {
+    const statusLabel = LABELS[o.status] || o.status;
     const mine = o.mine ? ' (min)' : (o.claimed ? ' (tildelt)' : '');
+    const claimedOrMine = o.claimed || o.mine;
+
     return `
-      <div class="ffp-order">
-        <div class="ffp-order-head"><strong>#${o.id}</strong> – ${o.status}${mine}</div>
+      <div class="ffp-order" data-id="${o.id}">
+        <div class="ffp-order-head">
+          <strong>#${o.id}</strong> – ${statusLabel}${mine}
+        </div>
         <div class="ffp-driver-actions">
-          ${o.claimed ? '' : `<button class="button ffp-claim" data-id="${o.id}">Ta ordre</button>`}
+          ${claimedOrMine ? '' : `<button class="button ffp-claim" data-id="${o.id}">Ta ordre</button>`}
           <button class="button ffp-status" data-id="${o.id}" data-status="ffp-out-for-delivery">Ut for levering</button>
           <button class="button button-primary ffp-status" data-id="${o.id}" data-status="completed">Fullført</button>
         </div>
@@ -23,8 +58,21 @@ jQuery(function ($) {
   }
 
   function render(list) {
-    const html = (Array.isArray(list) ? list : []).map(row).join('') || '<p>Ingen aktive ordre.</p>';
+    const arr = Array.isArray(list) ? list : [];
+    const html = arr.map(row).join('') || '<p>Ingen aktive ordre.</p>';
     $('#ffp-driver-app').html(html);
+
+    // Marker nye ordre én gang
+    arr.forEach(o => {
+      if (!seenIds.has(String(o.id))) {
+        const $el = $(`.ffp-order[data-id="${o.id}"]`);
+        $el.addClass('ffp-new');
+        // Fjern klassen etter animasjonen
+        setTimeout(() => $el.removeClass('ffp-new'), 1500);
+      }
+    });
+    // Oppdater “sett”
+    seenIds = new Set(arr.map(o => String(o.id)));
   }
 
   function load() {
@@ -37,6 +85,7 @@ jQuery(function ($) {
     });
   }
 
+  // Claim order
   $(document).on('click', '.ffp-claim', function () {
     const id = $(this).data('id');
     $.post({
@@ -47,6 +96,7 @@ jQuery(function ($) {
     });
   });
 
+  // Update status
   $(document).on('click', '.ffp-status', function () {
     const id = $(this).data('id');
     const s  = $(this).data('status');

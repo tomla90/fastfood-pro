@@ -13,7 +13,7 @@ class FFP_Driver {
 
         // Shortcodes
         add_shortcode('ffp_driver_portal', [$this,'shortcode_portal']);
-        add_shortcode('ffp_login',         [$this,'shortcode_login']);   // ← NY
+        add_shortcode('ffp_login',         [$this,'shortcode_login']);
 
         // Enqueue driver-portal assets kun når [ffp_driver_portal] er på siden
         add_action('wp_enqueue_scripts', [$this,'maybe_enqueue_assets']);
@@ -62,7 +62,8 @@ class FFP_Driver {
     public function maybe_enqueue_assets() {
         if (!is_singular()) return;
         $post = get_post();
-        if (!$post || stripos($post->post_content, '[ffp_driver_portal]') === false) return;
+        if (!$post) return;
+        if (!has_shortcode($post->post_content, 'ffp_driver_portal')) return;
 
         $js_path = FFP_DIR.'assets/js/driver-portal.js';
         $ver     = file_exists($js_path) ? filemtime($js_path) : FFP_VERSION;

@@ -38,10 +38,3 @@
 /* Breakdance cart-form kan bruke flex – sørg for full bredde */
 .woocommerce div.product form.cart > .ffp-addons{ flex-basis:100%; }
 
-/* Minimal styling brukt både i admin og frontend for Live Bestillinger */
-#ffp-orders-app { margin-top: 10px; }
-#ffp-orders-app .ffp-order { background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 12px; margin-bottom: 12px; }
-#ffp-orders-app .ffp-order-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
-#ffp-orders-app .ffp-order .button { line-height: 1.9; }
-#ffp-orders-app ul { margin: 6px 0; padding-left: 18px; }
-#ffp-orders-app em { color: #555; }

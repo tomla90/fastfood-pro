@@ -1,11 +1,7 @@
 <?php
 if (!defined('ABSPATH')) exit;
 
-/**
- * Henter og formatterer åpne WooCommerce-ordrer for FastFood Pro admin.
- */
 class FFP_Orders {
-
     public function __construct() {}
 
     /**
@@ -14,27 +10,21 @@ class FFP_Orders {
      * @return array<int, array<string,mixed>>
      */
     public static function get_open_orders(array $args = []) {
-        if ( ! class_exists('WC_Order_Query') ) {
-            return [];
-        }
+        if (!class_exists('WC_Order_Query')) return [];
 
-        // Status: komma-separert streng eller array. Fallback = "åpne" statuser.
+        // Status: streng "a,b,c" eller array. Fallback = våre "åpne".
         $statuses = $args['status'] ?? [
             'pending','on-hold','processing',
             'ffp-preparing','ffp-ready','ffp-out-for-delivery',
         ];
-        if (is_string($statuses)) {
-            $statuses = array_map('trim', explode(',', $statuses));
-        }
-        $statuses = array_values(array_filter(array_map('sanitize_key', (array) $statuses)));
+        if (is_string($statuses)) $statuses = array_map('trim', explode(',', $statuses));
+        $statuses = array_values(array_filter(array_map('sanitize_key', (array)$statuses)));
 
-        // Limit: 1–100, default 20.
-        $limit = isset($args['limit']) ? (int) $args['limit'] : 20;
-        if ($limit <= 0 || $limit > 100) {
-            $limit = 20;
-        }
+        // Limit: 1–100, default 20
+        $limit = isset($args['limit']) ? (int)$args['limit'] : 20;
+        if ($limit <= 0 || $limit > 100) $limit = 20;
 
-        $query = new WC_Order_Query([
+        $q = new WC_Order_Query([
             'status'  => $statuses,
             'limit'   => $limit,
             'orderby' => 'date',
@@ -42,8 +32,8 @@ class FFP_Orders {
             'return'  => 'objects',
         ]);
 
-        $orders = $query->get_orders();
-        $out    = [];
+        $orders = $q->get_orders();
+        $out = [];
 
         foreach ($orders as $o) {
             /** @var WC_Order $o */
@@ -58,15 +48,16 @@ class FFP_Orders {
             ]);
             $shipping_address = implode(' ', $shipping_parts);
 
+            // Kun varelinjer
             $items_arr = [];
-            foreach ($o->get_items() as $item) {
-                $qty  = method_exists($item, 'get_quantity') ? (int) $item->get_quantity() : 1;
+            foreach ($o->get_items('line_item') as $item) {
+                $qty  = method_exists($item, 'get_quantity') ? (int)$item->get_quantity() : 1;
                 $name = method_exists($item, 'get_name') ? $item->get_name() : '';
                 $items_arr[] = sprintf('%s x %d', $name, $qty);
             }
 
             $out[] = [
-                'id'               => (int) $o->get_id(),
+                'id'               => (int)$o->get_id(),
                 'status'           => sanitize_key($o->get_status()),
                 'total'            => wc_format_decimal($o->get_total(), wc_get_price_decimals()),
                 'currency'         => $o->get_currency(),
@@ -74,12 +65,11 @@ class FFP_Orders {
                 'billing_name'     => $billing_name ?: __('Ukjent kunde', 'fastfood-pro'),
                 'shipping_address' => $shipping_address,
                 'items'            => array_values($items_arr),
-                'note'             => (string) $o->get_customer_note(),
-
-                'ffp_tip'          => (float) ($o->get_meta('_ffp_tip', true) ?: 0),
-                'ffp_eta'          => (string) ($o->get_meta('_ffp_eta', true) ?: ''),
-                'ffp_delivery_when'=> (string) ($o->get_meta('_ffp_delivery_when', true) ?: ''),
-                'driver_id'        => $o->get_meta('_ffp_driver_id', true) ? (int) $o->get_meta('_ffp_driver_id', true) : null,
+                'note'             => (string)$o->get_customer_note(),
+                'ffp_tip'          => (float)($o->get_meta('_ffp_tip', true) ?: 0),
+                'ffp_eta'          => (string)($o->get_meta('_ffp_eta', true) ?: ''),
+                'ffp_delivery_when'=> (string)($o->get_meta('_ffp_delivery_when', true) ?: ''),
+                'driver_id'        => $o->get_meta('_ffp_driver_id', true) ? (int)$o->get_meta('_ffp_driver_id', true) : null,
             ];
         }
 

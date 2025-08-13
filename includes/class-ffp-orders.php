@@ -52,12 +52,13 @@ class FFP_Orders {
 
             $shipping_parts = array_filter([
                 $o->get_shipping_address_1(),
+                $o->get_shipping_address_2(),
                 $o->get_shipping_postcode(),
                 $o->get_shipping_city(),
             ]);
             $shipping_address = implode(' ', $shipping_parts);
 
-            // Varelinjer (visningsstrenger) + subtotal (linjetotaler ekskl. frakt)
+            // Varelinjer (visningsstrenger) + beregn linjesubtotal
             $items_arr      = [];
             $items_subtotal = 0.0;
             foreach ($o->get_items() as $item) {

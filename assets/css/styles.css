@@ -1,40 +1,50 @@
-.ffp-card {background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,.04)}
-.ffp-order {border:1px solid #eee;border-radius:10px;padding:12px;margin:10px 0}
-.ffp-order-head {display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
-.ffp-addons {margin:10px 0;padding:10px;border:1px dashed #ddd;border-radius:10px}
-.ffp-addon-row {display:block;margin:4px 0}
-.ffp-login input {width:100%}
-.ffp-driver-actions {display:flex;gap:8px;margin-bottom:8px}
+/* Kort-kontainer */
+.ffp-card { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:16px; box-shadow:0 2px 8px rgba(0,0,0,.04) }
+
+/* Orders (admin + driver) */
+.ffp-order { border:1px solid #eee; border-radius:12px; padding:12px; margin:12px 0; background:#fff; }
+.ffp-order-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; }
+.ffp-order-title { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.ffp-status { font-size:.9em; opacity:.85; }
+.ffp-badge { display:inline-block; padding:2px 8px; border-radius:999px; background:#eef2ff; color:#3730a3; font-size:.75rem; line-height:1.6; }
+.ffp-badge--mine { background:#ecfdf5; color:#065f46; }
+
+/* Layout for info-blokk */
+.ffp-order-block { border:1px dashed #e5e7eb; border-radius:10px; padding:10px; }
+.ffp-row { display:grid; grid-template-columns: 1fr 1fr; gap:16px; }
+@media (max-width: 800px) { .ffp-row { grid-template-columns: 1fr; } }
+.ffp-col { min-width: 0; }
+
+.ffp-items { margin:8px 0 6px 16px; }
+.ffp-items li { margin:2px 0; }
+
+.ffp-totals { margin-top:4px; font-size:.92em; }
+.ffp-totals > div { display:flex; justify-content:space-between; padding:2px 0; }
+.ffp-totals .ffp-total { font-weight:700; border-top:1px solid #eee; margin-top:4px; padding-top:6px; }
+
+.ffp-meta-row { display:flex; gap:10px; margin:2px 0; }
+.ffp-meta-row > span:first-child { width:140px; color:#555; }
+@media (max-width: 540px) { .ffp-meta-row { flex-direction:column; gap:2px; } .ffp-meta-row > span:first-child { width:auto; } }
+
+.ffp-driver-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+.ffp-driver-actions .button { line-height:1.9; }
+
+/* Eksisterende stil du hadde – beholdes */
+.ffp-addons { margin:10px 0; padding:10px; border:1px dashed #ddd; border-radius:10px }
+.ffp-addon-row { display:block; margin:4px 0 }
+.ffp-login input { width:100% }
 .ffp-map { width:100%; background:#f9fafb }
 
-
-/* --- Checkout: Tips pill-knapper + compact rows --- */
-.ffp-tip-group{
-  display:flex; flex-wrap:wrap; gap:8px; margin:6px 0 10px;
-}
-.ffp-tip-pill{
-  display:inline-flex; align-items:center; gap:8px;
-  border:1px solid #ddd; border-radius:999px; padding:6px 12px;
-  cursor:pointer; user-select:none; background:#fff;
-}
+/* Checkout tips-pill (som du hadde fra før) */
+.ffp-tip-group{ display:flex; flex-wrap:wrap; gap:8px; margin:6px 0 10px; }
+.ffp-tip-pill{ display:inline-flex; align-items:center; gap:8px; border:1px solid #ddd; border-radius:999px; padding:6px 12px; cursor:pointer; user-select:none; background:#fff; }
 .ffp-tip-pill input{ display:none; }
 .ffp-tip-pill span{ font-weight:600; font-size:.95em; }
-.ffp-tip-pill input:checked + span{
-  color:#fff; background:#333; border-radius:999px; padding:4px 10px;
-}
+.ffp-tip-pill input:checked + span{ color:#fff; background:#333; border-radius:999px; padding:4px 10px; }
 
-/* Egendefinert tips-felt skjult som default (vises av JS ved valg) */
-.ffp-tip-custom-row{ display:none; }
-
-/* Addons-boksen kompakt og pen */
-.ffp-addons{
-  margin:12px 0; padding:14px; border:1px dashed #e6e0d8;
-  border-radius:12px; background:rgba(0,0,0,.02);
-}
+/* Addons kompakt */
+.ffp-addons{ margin:12px 0; padding:14px; border:1px dashed #e6e0d8; border-radius:12px; background:rgba(0,0,0,.02); }
 .ffp-addon-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:6px 0; border-bottom:1px solid #eee; }
 .ffp-addon-row:last-child{ border-bottom:0; }
 .ffp-addon-price{ font-size:.85em; font-weight:500; opacity:.75; white-space:nowrap; }
-
-/* Breakdance cart-form kan bruke flex – sørg for full bredde */
 .woocommerce div.product form.cart > .ffp-addons{ flex-basis:100%; }
-

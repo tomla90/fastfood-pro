@@ -5,23 +5,21 @@ jQuery(function ($) {
   const REST = (p) => ffpDriver.restUrl.replace(/\/$/, '') + p;
   const HEAD = (xhr) => xhr.setRequestHeader('X-WP-Nonce', ffpDriver.nonce);
 
-  // Statuser sjåfør skal se (inkl. out-for-delivery, så ordren ikke forsvinner)
-  const ACTIVE = 'pending,on-hold,processing,ffp-preparing,ffp-ready,ffp-out-for-delivery';
+  // Viktig: bruk ffp-delivery (ny slug uten mellomrom)
+  const ACTIVE = 'pending,on-hold,processing,ffp-preparing,ffp-ready,ffp-delivery';
 
-  // Enkel beløpsformatter – vi viser som "<beløp> <valuta>"
-  const money = (v, cur) => `${(v ?? 0).toString()} ${cur || ''}`.trim();
-
-  // Pene statusetiketter (fallback til rå status)
   const STATUS_LABEL = {
     'pending': 'Venter',
     'on-hold': 'På hold',
     'processing': 'Behandles',
     'ffp-preparing': 'Tilberedes',
     'ffp-ready': 'Klar',
-    'ffp-out-for-delivery': 'Ut for levering',
+    'ffp-delivery': 'Ut for levering',
     'completed': 'Fullført',
     'cancelled': 'Kansellert'
   };
+
+  const money = (v, cur) => `${(v ?? 0).toString()} ${cur || ''}`.trim();
 
   function row(o) {
     const claimed = !!o.driver_id;
@@ -50,21 +48,9 @@ jQuery(function ($) {
         <div class="ffp-order-block">
           <div class="ffp-row">
             <div class="ffp-col">
-              <div class="ffp-meta-row">
-                <span>Kunde:</span>
-                <span><strong>${o.billing_name || ''}</strong></span>
-              </div>
-              <div class="ffp-meta-row">
-                <span>Kontakt:</span>
-                <span>
-                  ${o.billing_phone ? o.billing_phone : ''}
-                  ${o.billing_email ? (o.billing_phone ? ' • ' : '') + o.billing_email : ''}
-                </span>
-              </div>
-              <div class="ffp-meta-row">
-                <span>Adresse:</span>
-                <span>${o.shipping_address || ''}</span>
-              </div>
+              <div class="ffp-meta-row"><span>Kunde:</span><span><strong>${o.billing_name || ''}</strong></span></div>
+              <div class="ffp-meta-row"><span>Kontakt:</span><span>${o.billing_phone || ''}${o.billing_email ? (o.billing_phone ? ' • ' : '') + o.billing_email : ''}</span></div>
+              <div class="ffp-meta-row"><span>Adresse:</span><span>${o.shipping_address || ''}</span></div>
               ${o.payment_method ? `<div class="ffp-meta-row"><span>Betaling:</span><span>${o.payment_method}</span></div>` : ''}
               ${ships}
               ${coupons}
@@ -81,19 +67,14 @@ jQuery(function ($) {
             </div>
           </div>
 
-          <div class="ffp-meta-row">
-            <span>Notat:</span><span>${o.note || '-'}</span>
-          </div>
-          <div class="ffp-meta-row">
-            <span>Tips / ETA / Når:</span>
-            <span>${money(o.ffp_tip, o.currency)} • ${o.ffp_eta || '-'} • ${o.ffp_delivery_when || '-'}</span>
-          </div>
+          <div class="ffp-meta-row"><span>Notat:</span><span>${o.note || '-'}</span></div>
+          <div class="ffp-meta-row"><span>Tips / ETA / Når:</span><span>${money(o.ffp_tip, o.currency)} • ${o.ffp_eta || '-'} • ${o.ffp_delivery_when || '-'}</span></div>
         </div>
 
         <div class="ffp-driver-actions">
           ${claimed ? '' : `<button class="button ffp-claim" data-id="${o.id}">Ta ordre</button>`}
           <button class="button ffp-status" data-id="${o.id}" data-status="ffp-ready">Klar</button>
-          <button class="button ffp-status" data-id="${o.id}" data-status="ffp-out-for-delivery">Ut for levering</button>
+          <button class="button ffp-status" data-id="${o.id}" data-status="ffp-delivery">Ut for levering</button>
           <button class="button button-primary ffp-status" data-id="${o.id}" data-status="completed">Fullført</button>
         </div>
       </div>
@@ -116,7 +97,7 @@ jQuery(function ($) {
     });
   }
 
-  // Claim order
+  // Claim
   $(document).on('click', '.ffp-claim', function () {
     const id = $(this).data('id');
     $.post({
@@ -127,10 +108,10 @@ jQuery(function ($) {
     });
   });
 
-  // Update status
+  // Status
   $(document).on('click', '.ffp-status', function () {
     const id = $(this).data('id');
-    const s  = $(this).data('status');
+    const s  = $(this).data('status'); // ffp-ready | ffp-delivery | completed
     $.post({
       url: REST('/ffp/v1/orders/' + id + '/status'),
       data: { status: s },

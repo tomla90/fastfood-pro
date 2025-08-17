@@ -1,30 +1,29 @@
 /* global ffpOrders */
 (function ($) {
-  // Basic sanity-log (hjelper ved caching)
   try { console.log('FFP Orders JS loaded', window.ffpOrders); } catch(e){}
 
-  const restUrl = (window.ffpOrders && window.ffpOrders.restUrl) || (window.location.origin + '/wp-json');
+  const restUrl = (window.ffpOrders && window.ffpOrders.restUrl) || (window.location.origin + '/wp-json/');
   const nonce   = (window.ffpOrders && window.ffpOrders.nonce)   || '';
   const soundOn = !!(window.ffpOrders && window.ffpOrders.sound);
 
   const ORDERS_URL = restUrl.replace(/\/$/, '') + '/ffp/v1/orders';
 
-  // Tekstlabel for status (Woo-lignende)
+  // Slugs som serveren returnerer i "status". Bruk ffp-delivery (ny, uten mellomrom).
   const STATUS_LABELS = {
     'pending': 'Pending',
     'on-hold': 'On hold',
     'processing': 'Processing',
     'ffp-preparing': 'Preparing',
     'ffp-ready': 'Ready',
-    'ffp-out-for-delivery': 'Out for delivery',
+    'ffp-delivery': 'Out for Delivery',
     'completed': 'Completed',
     'cancelled': 'Cancelled',
     'refunded': 'Refunded',
     'failed': 'Failed',
   };
 
-  let lastMaxId = 0;   // lyd bare ved nye ordre
-  let muteOnce  = false; // ikke pip rett etter egen status-endring
+  let lastMaxId = 0;
+  let muteOnce  = false;
 
   function btn(label, id, s, current) {
     const active = current === s;
@@ -42,7 +41,7 @@
         <strong>#${o.id ?? ''}</strong> – <span class="ffp-status">${label}</span> – ${o.total ?? ''} ${o.currency ?? ''}
         ${btn('Preparing', o.id, 'ffp-preparing', o.status)}
         ${btn('Ready', o.id, 'ffp-ready', o.status)}
-        ${btn('Out for delivery', o.id, 'ffp-out-for-delivery', o.status)}
+        ${btn('Out for delivery', o.id, 'ffp-delivery', o.status)}
         ${btn('Complete', o.id, 'completed', o.status)}
       </div>
       <div><em>${o.billing_name || 'Ukjent kunde'}</em> – ${o.shipping_address || ''}</div>
@@ -65,13 +64,14 @@
       lastMaxId = Math.max(lastMaxId, maxId);
     }
 
-    muteOnce = false; // reset etter render
+    muteOnce = false;
     bind();
   }
 
   function load() {
+    // Viktig: inkluder ffp-delivery (ikke out-for-delivery)
     return $.get({
-      url: ORDERS_URL + '?status=pending,on-hold,processing,ffp-preparing,ffp-ready,ffp-out-for-delivery&limit=30',
+      url: ORDERS_URL + '?status=pending,on-hold,processing,ffp-preparing,ffp-ready,ffp-delivery&limit=40',
       beforeSend: x => x.setRequestHeader('X-WP-Nonce', nonce)
     }).done(render).fail((xhr) => {
       const body = xhr && xhr.responseJSON;
@@ -90,7 +90,7 @@
       const id = $(this).data('id'), s = $(this).data('s');
       muteOnce = true;
       $.post({
-        url: ORDERS_URL + '/' + id + '/status',
+        url: restUrl.replace(/\/$/, '') + '/ffp/v1/orders/' + id + '/status',
         data: { status: s },
         beforeSend: x => x.setRequestHeader('X-WP-Nonce', nonce)
       }).done(load).fail((xhr) => {
@@ -99,13 +99,7 @@
     });
   }
 
-  function poll() {
-    load().always(() => setTimeout(poll, 5000));
-  }
-
-  $(function(){
-    load();
-    poll();
-  });
+  function poll() { load().always(() => setTimeout(poll, 5000)); }
+  $(function(){ load(); poll(); });
 
 })(jQuery);

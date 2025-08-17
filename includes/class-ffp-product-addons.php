@@ -2,16 +2,20 @@
 if (!defined('ABSPATH')) exit;
 
 class FFP_Product_Addons {
-    const META_KEY = '_ffp_addons';
+    const META_KEY       = '_ffp_addons';       // produktets konfigurerte tillegg
+    const ORDERITEM_META = '_ffp_addons';       // lagres på order item
 
     public function __construct() {
-        add_action('add_meta_boxes', [$this,'metabox']);
-        add_action('save_post_product', [$this,'save'], 10, 2);
+        add_action('add_meta_boxes',              [$this,'metabox']);
+        add_action('save_post_product',           [$this,'save'], 10, 2);
 
         add_action('woocommerce_before_add_to_cart_button', [$this,'render_addons_on_product']);
-        add_filter('woocommerce_add_cart_item_data', [$this,'add_addons_to_cart'], 10, 3);
-        add_filter('woocommerce_get_item_data', [$this,'display_cart_item_data'], 10, 2);
-        add_action('woocommerce_before_calculate_totals', [$this,'modify_cart_item_price'], 20);
+        add_filter('woocommerce_add_cart_item_data',        [$this,'add_addons_to_cart'], 10, 3);
+        add_filter('woocommerce_get_item_data',             [$this,'display_cart_item_data'], 10, 2);
+        add_action('woocommerce_before_calculate_totals',   [$this,'modify_cart_item_price'], 20);
+
+        // VIKTIG: kopier addons fra cart item til order item slik at de kan vises i admin/driver
+        add_action('woocommerce_checkout_create_order_line_item', [$this,'add_addons_to_order_items'], 10, 4);
     }
 
     public function metabox() {
@@ -34,32 +38,26 @@ class FFP_Product_Addons {
         }
         echo '</div>';
 
-        echo '<button type="button" class="button" id="add-addon">Legg til tillegg</button>';
-
-        // Enkel JS for å legge til nye rader
-        ?>
+        echo '<button type="button" class="button" id="add-addon">Legg til tillegg</button>'; ?>
         <script>
         document.addEventListener('DOMContentLoaded', function(){
-            document.getElementById('add-addon').addEventListener('click', function(){
-                let c = document.getElementById('ffp-addons-container');
-                let row = document.createElement('div');
-                row.classList.add('ffp-addon-row');
-                row.innerHTML = '<input type="text" name="ffp_addons_label[]" placeholder="Navn" /> ' +
-                                '<input type="number" step="0.01" name="ffp_addons_price[]" placeholder="Pris" /> ' +
-                                '<button type="button" class="button remove-addon">Fjern</button>';
-                c.appendChild(row);
-            });
-            document.addEventListener('click', function(e){
-                if(e.target && e.target.classList.contains('remove-addon')){
-                    e.target.closest('.ffp-addon-row').remove();
-                }
-            });
+          document.getElementById('add-addon').addEventListener('click', function(){
+            let c = document.getElementById('ffp-addons-container');
+            let row = document.createElement('div');
+            row.classList.add('ffp-addon-row');
+            row.innerHTML = '<input type="text" name="ffp_addons_label[]" placeholder="Navn" /> ' +
+                            '<input type="number" step="0.01" name="ffp_addons_price[]" placeholder="Pris" /> ' +
+                            '<button type="button" class="button remove-addon">Fjern</button>';
+            c.appendChild(row);
+          });
+          document.addEventListener('click', function(e){
+            if(e.target && e.target.classList.contains('remove-addon')){
+              e.target.closest('.ffp-addon-row').remove();
+            }
+          });
         });
         </script>
-        <style>
-        .ffp-addon-row { margin-bottom: 5px; }
-        .ffp-addon-row input { margin-right: 5px; }
-        </style>
+        <style>.ffp-addon-row{margin-bottom:6px}.ffp-addon-row input{margin-right:6px}</style>
         <?php
     }
 
@@ -87,36 +85,35 @@ class FFP_Product_Addons {
         update_post_meta($post_id, self::META_KEY, wp_json_encode($addons));
     }
 
-  public function render_addons_on_product() {
-    global $product;
-    if (!$product) return;
+    /** Produkt-side */
+    public function render_addons_on_product() {
+        global $product; if (!$product) return;
+        $addons = json_decode(get_post_meta($product->get_id(), self::META_KEY, true), true);
+        if (empty($addons)) return;
 
-    $addons = json_decode(get_post_meta($product->get_id(), self::META_KEY, true), true);
-    if (empty($addons)) return;
-
-    echo '<div class="ffp-addons"><h4>Tillegg</h4>';
-    foreach ($addons as $a) {
-        $id    = esc_attr($a['id']);
-        $label = esc_html($a['label']);
-        $price = floatval($a['price']);
-
-        echo '<label class="ffp-addon-row">';
-        echo '  <input type="checkbox" name="ffp_addons[]" value="'.$id.'" data-price="'.$price.'"> ';
-        echo '  <span class="ffp-addon-label">'.$label.'</span>';
-        echo '  <span class="ffp-addon-price">'.wc_price($price).'</span>';
-        echo '</label>';
+        echo '<div class="ffp-addons"><h4>Tillegg</h4>';
+        foreach ($addons as $a) {
+            $id    = esc_attr($a['id']);
+            $label = esc_html($a['label']);
+            $price = floatval($a['price']);
+            echo '<label class="ffp-addon-row">';
+            echo '  <input type="checkbox" name="ffp_addons[]" value="'.$id.'" data-price="'.$price.'"> ';
+            echo '  <span class="ffp-addon-label">'.$label.'</span>';
+            echo '  <span class="ffp-addon-price">'.wc_price($price).'</span>';
+            echo '</label>';
+        }
+        echo '</div>';
     }
-    echo '</div>';
-}
 
+    /** Legg valgte addons på cart item */
     public function add_addons_to_cart($cart_item_data, $product_id, $variation_id) {
-        $addons = json_decode(get_post_meta($product_id, self::META_KEY, true), true);
+        $addons = json_decode(get_post_meta($product_id, self::META_KEY, true), true) ?: [];
         $map = [];
         foreach ($addons as $a) $map[$a['id']] = $a;
 
-        $chosen = isset($_POST['ffp_addons']) ? (array) $_POST['ffp_addons'] : [];
+        $chosen   = isset($_POST['ffp_addons']) ? (array) $_POST['ffp_addons'] : [];
         $selected = [];
-        $extra = 0.0;
+        $extra    = 0.0;
         foreach ($chosen as $id) {
             if (isset($map[$id])) {
                 $selected[] = [
@@ -128,35 +125,44 @@ class FFP_Product_Addons {
             }
         }
         if ($selected) {
-            $cart_item_data['ffp_addons'] = $selected;
+            $cart_item_data['ffp_addons']       = $selected;
             $cart_item_data['ffp_addons_extra'] = $extra;
-            $cart_item_data['unique_key'] = md5(microtime().rand());
+            $cart_item_data['unique_key']       = md5(microtime().rand());
         }
         return $cart_item_data;
     }
 
+    /** Vis addons under linje i handlekurv */
     public function display_cart_item_data($item_data, $cart_item) {
         if (!empty($cart_item['ffp_addons'])) {
             foreach ($cart_item['ffp_addons'] as $a) {
                 $item_data[] = [
-                    'name' => $a['label'],
-                    'value' => wc_price($a['price']),
-                    'display' => wc_price($a['price'])
+                    'name'    => $a['label'],
+                    'value'   => wc_price($a['price']),
+                    'display' => wc_price($a['price']),
                 ];
             }
         }
         return $item_data;
     }
 
+    /** Øk pris på cart item */
     public function modify_cart_item_price($cart) {
         if (is_admin() && !defined('DOING_AJAX')) return;
         if (did_action('woocommerce_before_calculate_totals') >= 2) return;
 
         foreach ($cart->get_cart() as $cart_item) {
             if (!empty($cart_item['ffp_addons_extra'])) {
-                $price = $cart_item['data']->get_price();
-                $cart_item['data']->set_price($price + floatval($cart_item['ffp_addons_extra']));
+                $price = (float) $cart_item['data']->get_price();
+                $cart_item['data']->set_price($price + (float) $cart_item['ffp_addons_extra']);
             }
+        }
+    }
+
+    /** LAGRE addons på order item */
+    public function add_addons_to_order_items($item, $cart_item_key, $values, $order) {
+        if (!empty($values['ffp_addons']) && is_array($values['ffp_addons'])) {
+            $item->add_meta_data(self::ORDERITEM_META, wp_json_encode($values['ffp_addons']), true);
         }
     }
 }

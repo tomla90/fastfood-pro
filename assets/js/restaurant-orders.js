@@ -5,10 +5,10 @@
   const restUrl = (window.ffpOrders && window.ffpOrders.restUrl) || (window.location.origin + '/wp-json/');
   const nonce   = (window.ffpOrders && window.ffpOrders.nonce)   || '';
   const soundOn = !!(window.ffpOrders && window.ffpOrders.sound);
+  const soundSrc= (window.ffpOrders && window.ffpOrders.soundSrc) || 'https://actions.google.com/sounds/v1/alarms/beep_short.ogg';
 
   const ORDERS_URL = restUrl.replace(/\/$/, '') + '/ffp/v1/orders';
 
-  // Slugs som serveren returnerer i "status". Bruk ffp-delivery (ny, uten mellomrom).
   const STATUS_LABELS = {
     'pending': 'Pending',
     'on-hold': 'On hold',
@@ -55,11 +55,10 @@
     const html = arr.map(row).join('');
     $('#ffp-orders-app').html(html || '<p>Ingen åpne ordre.</p>');
 
-    // Lyd ved nye ordre
     if (soundOn && arr.length) {
       const maxId = arr.reduce((m, o) => Math.max(m, Number(o.id || 0)), 0);
       if (!muteOnce && maxId > lastMaxId) {
-        try { new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg').play(); } catch(e){}
+        try { new Audio(soundSrc).play(); } catch(e){}
       }
       lastMaxId = Math.max(lastMaxId, maxId);
     }
@@ -69,7 +68,6 @@
   }
 
   function load() {
-    // Viktig: inkluder ffp-delivery (ikke out-for-delivery)
     return $.get({
       url: ORDERS_URL + '?status=pending,on-hold,processing,ffp-preparing,ffp-ready,ffp-delivery&limit=40',
       beforeSend: x => x.setRequestHeader('X-WP-Nonce', nonce)

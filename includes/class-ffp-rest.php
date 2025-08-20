@@ -3,7 +3,7 @@ if (!defined('ABSPATH')) exit;
 
 class FFP_REST {
 
-  /** Intern vakt for å hindre trash i statusoppdatering */
+  /** Vakt mot trash ved statusendring */
   private static $guarding = false;
 
   public function __construct() {
@@ -16,17 +16,14 @@ class FFP_REST {
     return is_user_logged_in() && (in_array('driver', $roles, true) || in_array('ffp_driver', $roles, true));
   }
 
-  /** Ikke tillat trash når vi er i en FFP-statusoppdatering */
   public static function no_trash_guard($trash, $post) {
-    if (self::$guarding && $post && $post->post_type === 'shop_order') {
-      return false; // blokker trash
-    }
+    if (self::$guarding && $post && $post->post_type === 'shop_order') return false;
     return $trash;
   }
 
   public function routes() {
 
-    // GET /wp-json/ffp/v1/orders
+    // GET /ffp/v1/orders
     register_rest_route('ffp/v1', '/orders', [
       'methods'  => 'GET',
       'permission_callback' => function () {
@@ -50,14 +47,21 @@ class FFP_REST {
         ],
       ],
       'callback' => function (WP_REST_Request $req) {
+        $status = $req->get_param('status');
+
+        // Sjåfører skal ALDRI få annet enn Ready + Delivery
+        if (self::is_driver_role()) {
+          $status = 'ffp-ready,ffp-delivery';
+        }
+
         return rest_ensure_response( FFP_Orders::get_open_orders([
-          'status' => $req->get_param('status'),
+          'status' => $status,
           'limit'  => $req->get_param('limit'),
         ]) );
       }
     ]);
 
-    // POST /wp-json/ffp/v1/orders/{id}/status
+    // POST /ffp/v1/orders/{id}/status
     register_rest_route('ffp/v1', '/orders/(?P<id>\d+)/status', [
       'methods'  => 'POST',
       'permission_callback' => function () {
@@ -71,7 +75,7 @@ class FFP_REST {
       'callback' => [$this, 'update_status']
     ]);
 
-    // POST /wp-json/ffp/v1/orders/{id}/claim
+    // POST /ffp/v1/orders/{id}/claim
     register_rest_route('ffp/v1', '/orders/(?P<id>\d+)/claim', [
       'methods'  => 'POST',
       'permission_callback' => function () {
@@ -91,35 +95,28 @@ class FFP_REST {
     if (!$order) return new WP_Error('ffp_not_found', 'Order not found', ['status'=>404]);
 
     $status  = sanitize_key($req->get_param('status'));
-    // gyldige slugs (uten "wc-")
     $allowed = ['ffp-preparing','ffp-ready','ffp-delivery','completed','processing','on-hold'];
-
     if (!in_array($status, $allowed, true)) {
       return new WP_Error('ffp_bad_status', 'Invalid status', ['status'=>400]);
     }
 
-    // Hvis noen (annet plugin) allerede har trykket trash – hent ut
     if (get_post_status($id) === 'trash') {
       wp_untrash_post($id);
       clean_post_cache($id);
       $order = wc_get_order($id);
     }
 
-    // Aktiver trash-guard for denne operasjonen
     self::$guarding = true;
     add_filter('pre_trash_post', [__CLASS__, 'no_trash_guard'], 10, 2);
 
-    // Idempotent og uten sletting
     if ($order->get_status() !== $status) {
       $order->set_status($status);
       $order->save();
     }
 
-    // Deaktiver guard
     remove_filter('pre_trash_post', [__CLASS__, 'no_trash_guard'], 10);
     self::$guarding = false;
 
-    // Dobbel-sjekk: om posten likevel havnet i trash -> trekk den ut og sett statusen
     if (get_post_status($id) === 'trash') {
       wp_untrash_post($id);
       clean_post_cache($id);

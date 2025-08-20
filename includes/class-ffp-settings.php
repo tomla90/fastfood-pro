@@ -1,7 +1,4 @@
 <?php
-/**
- * FastFood Pro – Settings screen (full GUI uten JSON)
- */
 if (!defined('ABSPATH')) exit;
 
 class FFP_Settings {
@@ -11,6 +8,7 @@ class FFP_Settings {
         return [
             ['store_mode',       'Butikkmodus', 'select', ['takeaway'=>'Takeaway','delivery'=>'Delivery','both'=>'Begge']],
             ['order_sound',      'Lyd ved ny ordre (admin)', 'checkbox'],
+            ['order_sound_src',  'Lydfil for ny ordre', 'media'], // NY
             ['onesignal_app_id', 'OneSignal App ID (valgfritt)', 'text'],
             ['onesignal_rest_key','OneSignal REST API Key (valgfritt)', 'text'],
             ['license_server',   'Lisensserver URL', 'text'],
@@ -40,27 +38,13 @@ class FFP_Settings {
     }
 
     public function enqueue_assets($hook) {
-        // Sjekk at vi er på vår innstillingsside
-        if ($hook !== 'woocommerce_page_ffp_settings' && $hook !== 'settings_page_ffp_settings') {
-            return;
-        }
+        if ($hook !== 'woocommerce_page_ffp_settings' && $hook !== 'settings_page_ffp_settings') return;
 
-        // JS
-        wp_enqueue_script(
-            'ffp-settings-js',
-            FFP_URL . 'assets/js/settings.js',
-            ['jquery'],
-            FFP_VERSION,
-            true
-        );
+        wp_enqueue_script('ffp-settings-js', FFP_URL.'assets/js/settings.js', ['jquery'], FFP_VERSION, true);
+        wp_enqueue_style('ffp-settings-css', FFP_URL.'assets/css/settings.css', [], FFP_VERSION);
 
-        // CSS
-        wp_enqueue_style(
-            'ffp-settings-css',
-            FFP_URL . 'assets/css/settings.css',
-            [],
-            FFP_VERSION
-        );
+        // For media-feltet
+        wp_enqueue_media();
     }
 
     public function menu() {
@@ -100,10 +84,10 @@ class FFP_Settings {
                     break;
                 case 'custom_price':
                     $out['pricing_formula'] = [
-                        'base' => floatval($input['price_base'] ?? 0),
+                        'base'   => floatval($input['price_base'] ?? 0),
                         'per_km' => floatval($input['price_per_km'] ?? 0),
-                        'min' => floatval($input['price_min'] ?? 0),
-                        'max' => floatval($input['price_max'] ?? 0),
+                        'min'    => floatval($input['price_min'] ?? 0),
+                        'max'    => floatval($input['price_max'] ?? 0),
                     ];
                     break;
                 case 'custom_zones':
@@ -112,16 +96,19 @@ class FFP_Settings {
                         foreach ($input['zone_name'] as $i => $name) {
                             if (trim($name) === '') continue;
                             $zones[] = [
-                                'name' => sanitize_text_field($name),
+                                'name'           => sanitize_text_field($name),
                                 'postcode_regex' => sanitize_text_field($input['zone_regex'][$i] ?? ''),
-                                'base' => floatval($input['zone_base'][$i] ?? 0),
-                                'per_km' => floatval($input['zone_per_km'][$i] ?? 0),
-                                'min' => floatval($input['zone_min'][$i] ?? 0),
-                                'max' => floatval($input['zone_max'][$i] ?? 0),
+                                'base'           => floatval($input['zone_base'][$i] ?? 0),
+                                'per_km'         => floatval($input['zone_per_km'][$i] ?? 0),
+                                'min'            => floatval($input['zone_min'][$i] ?? 0),
+                                'max'            => floatval($input['zone_max'][$i] ?? 0),
                             ];
                         }
                     }
                     $out['zones'] = $zones;
+                    break;
+                case 'media':
+                    $out[$id] = esc_url_raw($input[$id] ?? '');
                     break;
                 default:
                     $out[$id] = sanitize_text_field($input[$id] ?? '');
@@ -177,6 +164,14 @@ class FFP_Settings {
                 }
                 echo '</tbody></table>';
                 echo '<p><button type="button" class="button" id="ffp-add-zone">+ Legg til sone</button></p>';
+                break;
+            case 'media':
+                $url = esc_url($val ?: '');
+                $fid = $this->option.'_'.$id;
+                echo '<div class="ffp-media-field" id="'.esc_attr($fid).'">';
+                echo '  <input type="text" class="regular-text ffp-media-url" name="'.$this->option.'['.$id.']" value="'.$url.'" placeholder="https://...">';
+                echo '  <button type="button" class="button ffp-media-select">Velg fra media</button>';
+                echo '</div>';
                 break;
             default:
                 echo '<input type="text" class="regular-text" name="'.$this->option.'['.$id.']" value="'.esc_attr($val).'">';

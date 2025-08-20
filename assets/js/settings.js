@@ -1,5 +1,5 @@
 /**
- * FastFood Pro - Admin Settings UI (Zones + Validation)
+ * FastFood Pro - Admin Settings UI (Zones + Validation + Media uploader)
  */
 jQuery(function ($) {
   const optName = "ffp_settings";
@@ -149,11 +149,7 @@ jQuery(function ($) {
       }
 
       if (v.regex) {
-        try {
-          new RegExp(v.regex);
-        } catch (err) {
-          errors.push(`Rad ${rowIndex}: Ugyldig regex.`);
-        }
+        try { new RegExp(v.regex); } catch (err) { errors.push(`Rad ${rowIndex}: Ugyldig regex.`); }
       }
     });
 
@@ -187,4 +183,29 @@ jQuery(function ($) {
       max: "Maks",
     }[key] || key;
   }
+
+  /* ===========================
+     Media-uploader for lydfelt
+     Felt-ID: ffp_settings[order_sound_src]
+     =========================== */
+  // Forutsetter at wp_enqueue_media() er kalt i PHP (FFP_Settings::enqueue_assets)
+  $(document).on('click', '.ffp-media-select', function(e){
+    e.preventDefault();
+    const $wrap  = $(this).closest('.ffp-media-field');
+    const $input = $wrap.find('.ffp-media-url');
+
+    const frame = wp.media({
+      title: 'Velg lydfil',
+      button: { text: 'Bruk denne' },
+      multiple: false,
+      library: { type: ['audio/mpeg','audio/mp3','audio/wav','audio/ogg'] }
+    });
+
+    frame.on('select', function(){
+      const att = frame.state().get('selection').first().toJSON();
+      $input.val(att.url).trigger('change');
+    });
+
+    frame.open();
+  });
 });

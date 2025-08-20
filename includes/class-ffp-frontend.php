@@ -19,7 +19,7 @@ class FFP_Frontend {
         // Base CSS – liten, kan lastes globalt
         wp_enqueue_style(
             'ffp-frontend',
-            plugins_url('../assets/styles.css', __FILE__), // __FILE__ peker på includes/, derfor ../
+            plugins_url('../assets/css/styles.css', __FILE__), // __FILE__ peker på includes/, derfor ../
             [],
             '1.0'
         );

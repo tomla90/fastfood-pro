@@ -18,13 +18,17 @@ class FFP_Orders {
         $limit = isset($args['limit']) ? (int)$args['limit'] : 40;
         if ($limit <= 0 || $limit > 100) $limit = 40;
 
-        // Bygg meta_query ved behov (kun delivery for sjåfører)
+        // --- Viktig: meta_query for å eksponere KUN delivery når etterspurt ---
         $meta_query = [];
         if (!empty($args['delivery_only'])) {
-            $meta_query[] = [
-                'key'     => '_ffp_delivery_type',
-                'value'   => 'delivery',
-                'compare' => '=',
+            $meta_query = [
+                'relation' => 'AND',
+                [
+                    'key'     => '_ffp_delivery_type',
+                    'value'   => 'delivery',
+                    'compare' => '=',
+                    'type'    => 'CHAR',
+                ],
             ];
         }
 

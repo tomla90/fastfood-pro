@@ -3,7 +3,6 @@ if (!defined('ABSPATH')) exit;
 
 class FFP_REST {
 
-  /** Vakt mot trash ved statusendring */
   private static $guarding = false;
 
   public function __construct() {
@@ -49,10 +48,10 @@ class FFP_REST {
       'callback' => function (WP_REST_Request $req) {
         $status = $req->get_param('status');
 
-        // Sjåfører: kun Ready + Out for Delivery, og KUN delivery-ordre
+        // Sjåfører: kun Ready + Out for Delivery + KUN delivery-type fra backend
         $delivery_only = false;
         if (self::is_driver_role()) {
-          $status = 'ffp-ready,ffp-delivery';
+          $status        = 'ffp-ready,ffp-delivery';
           $delivery_only = true;
         }
 
@@ -152,7 +151,6 @@ class FFP_REST {
     }
 
     $order->update_meta_data('_ffp_driver_id', $uid);
-    // Ved claim: sett status til "Out for Delivery"
     $order->set_status('ffp-delivery');
     $order->save();
 

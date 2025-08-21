@@ -70,17 +70,19 @@ jQuery(function ($) {
 
         <div class="ffp-driver-actions">
           ${claimed ? '' : `<button class="button ffp-claim" data-id="${o.id}">Ta ordre</button>`}
-          <button class="button ffp-status" data-id="${o.id}" data-status="ffp-ready">Klar</button>
-          <button class="button ffp-status" data-id="${o.id}" data-status="ffp-delivery">Ut for levering</button>
-          <button class="button button-primary ffp-status" data-id="${o.id}" data-status="completed">Fullført</button>
+          ${mine ? `<button class="button ffp-status" data-id="${o.id}" data-status="ffp-delivery">Ut for levering</button>` : ''}
+          ${mine ? `<button class="button button-primary ffp-status" data-id="${o.id}" data-status="completed">Fullført</button>` : ''}
         </div>
       </div>
     `;
   }
 
   function render(list) {
-    const arr = Array.isArray(list) ? list : [];
-    const html = arr.map(row).join('') || '<p>Ingen aktive ordre.</p>';
+    const arr = (Array.isArray(list) ? list : [])
+      // Ekstra sikkerhet: ikke vis pickup
+      .filter(o => o.ffp_delivery_type === 'delivery');
+
+    const html = arr.map(row).join('') || '<p>Ingen leveringer akkurat nå.</p>';
     $('#ffp-driver-app').html(html);
   }
 

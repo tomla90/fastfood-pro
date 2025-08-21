@@ -9,8 +9,13 @@ class FFP_Driver {
         add_action('init', [__CLASS__, 'ensure_role_caps']);
         add_filter('user_has_cap', [$this,'grant_driver_caps'], 10, 3);
 
+        // Shortcodes
         add_shortcode('ffp_driver_portal', [$this,'shortcode_portal']);
         add_shortcode('ffp_login',         [$this,'shortcode_login']);
+
+        // NY: eneste du trenger – en logout-knapp som alltid redirecter riktig
+        add_shortcode('ffp_logout_button', [$this,'shortcode_logout_button']);
+        add_action('template_redirect',    [$this,'maybe_do_button_logout']); // håndterer ?ffp_btn_logout=1
 
         add_action('wp_enqueue_scripts',   [$this,'maybe_enqueue_assets']);
         add_action('woocommerce_admin_order_data_after_order_details', [$this,'admin_driver_info']);
@@ -64,6 +69,72 @@ class FFP_Driver {
         ob_start();
         wp_login_form(['echo'=>true, 'redirect'=>esc_url_raw($a['redirect'])]);
         return ob_get_clean();
+    }
+
+    /** Eneste du trenger i builderen:
+     * [ffp_logout_button redirect="/driver-portal/" label="Logg ut" class="button"]
+     * Vises kun når innlogget. Logger ut uten å trigge wp_logout-hooks og redirecter dit du ber om.
+     */
+    public function shortcode_logout_button($atts = []) {
+        if (!is_user_logged_in()) return ''; // vis ikke når utlogget
+        $a = shortcode_atts([
+            'redirect' => '/driver-portal/',
+            'label'    => __('Logg ut', 'fastfood-pro'),
+            'class'    => 'button',
+        ], $atts);
+
+        // Normaliser target
+        $target = (strpos($a['redirect'], 'http') === 0) ? $a['redirect'] : home_url($a['redirect']);
+
+        // Pek til vår egen "lette" logout-handler (ingen rewrite nødvendig)
+        $url = add_query_arg([
+            'ffp_btn_logout' => 1,
+            'redirect_to'    => $target,
+        ], home_url('/'));
+
+        return sprintf(
+            '<a href="%s" class="%s">%s</a>',
+            esc_url($url),
+            esc_attr($a['class']),
+            esc_html($a['label'])
+        );
+    }
+
+    /** Utfør "lett" logout når ?ffp_btn_logout=1 – omgår andre wp_logout-redirects */
+    public function maybe_do_button_logout() {
+        if (!isset($_GET['ffp_btn_logout']) || (int) $_GET['ffp_btn_logout'] !== 1) return;
+
+        // Bare hvis innlogget
+        if (is_user_logged_in()) {
+            if (function_exists('wp_destroy_current_session')) {
+                wp_destroy_current_session();
+            }
+            wp_clear_auth_cookie();
+            wp_set_current_user(0);
+            /**
+             * Ikke kall wp_logout() – den fyrer 'wp_logout' som andre hooks kan hijacke.
+             * Vi har allerede logget ut ved å rydde cookies/sesjon.
+             */
+        }
+
+        // Bestem redirect (tillat full URL på samme domene, eller relativ sti)
+        $home  = home_url('/');
+        $redir = isset($_GET['redirect_to']) ? wp_unslash($_GET['redirect_to']) : $home;
+
+        // Relativ → gjør om til absolutt
+        if (strpos($redir, '/') === 0) {
+            $redir = home_url($redir);
+        }
+
+        // Sjekk at domenet matcher
+        $home_host  = wp_parse_url($home, PHP_URL_HOST);
+        $redir_host = wp_parse_url($redir, PHP_URL_HOST);
+        if (!$redir_host || strcasecmp($home_host, $redir_host) !== 0) {
+            $redir = $home;
+        }
+
+        wp_safe_redirect($redir);
+        exit;
     }
 
     public function maybe_enqueue_assets() {

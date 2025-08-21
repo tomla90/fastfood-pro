@@ -49,14 +49,17 @@ class FFP_REST {
       'callback' => function (WP_REST_Request $req) {
         $status = $req->get_param('status');
 
-        // Sjåfører skal ALDRI få annet enn Ready + Delivery
+        // Sjåfører: kun Ready + Out for Delivery, og KUN delivery-ordre
+        $delivery_only = false;
         if (self::is_driver_role()) {
           $status = 'ffp-ready,ffp-delivery';
+          $delivery_only = true;
         }
 
         return rest_ensure_response( FFP_Orders::get_open_orders([
-          'status' => $status,
-          'limit'  => $req->get_param('limit'),
+          'status'        => $status,
+          'limit'         => $req->get_param('limit'),
+          'delivery_only' => $delivery_only,
         ]) );
       }
     ]);
@@ -136,14 +139,23 @@ class FFP_REST {
     $uid = get_current_user_id();
     if (!$uid) return new WP_Error('ffp_auth', 'Login required', ['status'=>403]);
 
+    // Kun claim hvis delivery-type og status = ffp-ready
+    $type = (string) $order->get_meta('_ffp_delivery_type', true);
+    $st   = sanitize_key($order->get_status());
+    if ($type !== 'delivery' || $st !== 'ffp-ready') {
+      return new WP_Error('ffp_not_claimable', 'Order is not claimable', ['status'=>409]);
+    }
+
     $existing = (int) $order->get_meta('_ffp_driver_id', true);
     if ($existing && $existing !== $uid && !current_user_can('ffp_update_orders') && !current_user_can('manage_woocommerce')) {
       return new WP_Error('ffp_taken', 'Already assigned', ['status'=>409]);
     }
 
     $order->update_meta_data('_ffp_driver_id', $uid);
+    // Ved claim: sett status til "Out for Delivery"
+    $order->set_status('ffp-delivery');
     $order->save();
 
-    return ['ok'=>true, 'id'=>$id, 'driver'=>$uid];
+    return ['ok'=>true, 'id'=>$id, 'driver'=>$uid, 'status'=>'ffp-delivery'];
   }
 }

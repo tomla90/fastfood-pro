@@ -18,12 +18,23 @@ class FFP_Orders {
         $limit = isset($args['limit']) ? (int)$args['limit'] : 40;
         if ($limit <= 0 || $limit > 100) $limit = 40;
 
+        // Bygg meta_query ved behov (kun delivery for sjåfører)
+        $meta_query = [];
+        if (!empty($args['delivery_only'])) {
+            $meta_query[] = [
+                'key'     => '_ffp_delivery_type',
+                'value'   => 'delivery',
+                'compare' => '=',
+            ];
+        }
+
         $q = new WC_Order_Query([
-            'status'  => $statuses,
-            'limit'   => $limit,
-            'orderby' => 'date',
-            'order'   => 'DESC',
-            'return'  => 'objects',
+            'status'     => $statuses,
+            'limit'      => $limit,
+            'orderby'    => 'date',
+            'order'      => 'DESC',
+            'return'     => 'objects',
+            'meta_query' => $meta_query ?: null,
         ]);
 
         $orders = $q->get_orders();
@@ -103,7 +114,7 @@ class FFP_Orders {
                 : ucfirst($status_key);
 
             if ($ffp_delivery_type === 'pickup') {
-                $shipping_total  = 0.0;
+                $shipping_total   = 0.0;
                 $shipping_methods = [];
             }
 
@@ -135,6 +146,7 @@ class FFP_Orders {
                 'ffp_tip'          => (float) ($o->get_meta('_ffp_tip', true) ?: 0),
                 'ffp_eta'          => (string) ($o->get_meta('_ffp_eta', true) ?: ''),
                 'ffp_delivery_when'=> (string) ($o->get_meta('_ffp_delivery_when', true) ?: ''),
+                'ffp_delivery_type'=> (string) $ffp_delivery_type,
                 'driver_id'        => $o->get_meta('_ffp_driver_id', true) ? (int) $o->get_meta('_ffp_driver_id', true) : null,
             ];
         }

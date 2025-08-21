@@ -12,7 +12,7 @@ class FFP_Driver {
         add_shortcode('ffp_driver_portal', [$this,'shortcode_portal']);
         add_shortcode('ffp_login',         [$this,'shortcode_login']);
 
-        add_action('wp_enqueue_scripts', [$this,'maybe_enqueue_assets']);
+        add_action('wp_enqueue_scripts',   [$this,'maybe_enqueue_assets']);
         add_action('woocommerce_admin_order_data_after_order_details', [$this,'admin_driver_info']);
     }
 
@@ -38,12 +38,22 @@ class FFP_Driver {
     public function shortcode_portal() {
         if (!is_user_logged_in() || !current_user_can('ffp_view_orders')) {
             return '<div class="ffp-login"><p>' .
-                   esc_html__('Logg inn som sjåfør for å se dine ordrer.', 'fastfood-pro') .
+                   esc_html__('Logg inn som sjåfør for å se dine leveringer.', 'fastfood-pro') .
                    '</p>' . wp_login_form(['echo'=>false]) . '</div>';
         }
-        return '<div id="ffp-driver-app" class="ffp-card"><p>' .
-               esc_html__('Laster ordrer…', 'fastfood-pro') .
-               '</p></div>';
+
+        $logout_url = wp_logout_url(get_permalink());
+
+        return '<div id="ffp-driver-app" class="ffp-card">'.
+                 '<div class="ffp-driver-header" style="display:flex;gap:.5rem;align-items:center;justify-content:space-between;">' .
+                    '<h3 style="margin:0">' . esc_html__('Leveringer', 'fastfood-pro') . '</h3>' .
+                    '<div class="ffp-driver-actions">' .
+                      '<button class="button" id="ffp-refresh" type="button">'.esc_html__('Oppdater','fastfood-pro').'</button> ' .
+                      '<a class="button" href="'.esc_url($logout_url).'">'.esc_html__('Logg ut','fastfood-pro').'</a>' .
+                    '</div>' .
+                 '</div>'.
+                 '<div id="ffp-driver-list" style="margin-top:.75rem">Laster…</div>'.
+               '</div>';
     }
 
     public function shortcode_login($atts = []) {
@@ -64,7 +74,7 @@ class FFP_Driver {
         if (!$has_sc) return;
 
         $js_path = FFP_DIR . 'assets/js/driver-portal.js';
-        $ver     = file_exists($js_path) ? filemtime($js_path) : FFP_VERSION;
+        $ver     = file_exists($js_path) ? filemtime($js_path) : (defined('FFP_VERSION') ? FFP_VERSION : '1.0.0');
 
         wp_enqueue_script('ffp-driver-portal', FFP_URL . 'assets/js/driver-portal.js', ['jquery'], $ver, true);
         wp_localize_script('ffp-driver-portal', 'ffpDriver', [
@@ -73,7 +83,7 @@ class FFP_Driver {
             'userId'  => get_current_user_id(),
         ]);
 
-        wp_enqueue_style('ffp-driver-portal', FFP_URL . 'assets/css/styles.css', [], FFP_VERSION);
+        wp_enqueue_style('ffp-driver-portal', FFP_URL . 'assets/css/styles.css', [], $ver);
     }
 
     public function admin_driver_info($order) {

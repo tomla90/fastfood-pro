@@ -10,21 +10,17 @@ class FFP_Frontend {
         add_action('init',                 [$this,'handle_login']);
         add_action('wp_logout', function(){ wp_safe_redirect(home_url()); exit; });
 
-        // ENQUEUE ASSETS (frontend)
         add_action('wp_enqueue_scripts',   [$this,'enqueue_assets']);
     }
 
-    /** Enqueue frontend CSS/JS */
     public function enqueue_assets() {
-        // Base CSS – liten, kan lastes globalt
         wp_enqueue_style(
             'ffp-frontend',
-            plugins_url('../assets/css/styles.css', __FILE__), // __FILE__ peker på includes/, derfor ../
+            plugins_url('../assets/css/styles.css', __FILE__),
             [],
             '1.0'
         );
 
-        // Checkout UI (tips-pill + pickup/levering)
         if (is_checkout()) {
             wp_enqueue_script(
                 'ffp-checkout',
@@ -35,17 +31,15 @@ class FFP_Frontend {
             );
         }
 
-        // Driver-portal: last kun hvis shortcoden er på siden
         if ($this->is_current_page_has_shortcode('ffp_driver_portal')) {
             wp_enqueue_script(
                 'ffp-driver',
-                plugins_url('../assets/js/driver.js', __FILE__), // lag denne om du ikke har den
+                plugins_url('../assets/js/driver.js', __FILE__),
                 ['jquery'],
                 '1.0',
                 true
             );
 
-            // Pass REST-info/nonce til JS
             wp_localize_script('ffp-driver', 'FFP_DRIVER', [
                 'rest'  => rest_url('ffp/v1'),
                 'nonce' => wp_create_nonce('wp_rest'),
@@ -53,7 +47,6 @@ class FFP_Frontend {
         }
     }
 
-    /** Hjelper: sjekk om nåværende innhold har shortcoden */
     private function is_current_page_has_shortcode($shortcode) {
         if (!is_singular()) return false;
         $post = get_post();
@@ -65,12 +58,13 @@ class FFP_Frontend {
         if (!is_user_logged_in() || !current_user_can('ffp_driver')) {
             return '<div class="ffp-card"><p>Logg inn som sjåfør for å se leveringer.</p>[ffp_login]</div>';
         }
+        $logout_url = wp_logout_url(get_permalink());
         ob_start(); ?>
         <div id="ffp-driver-app" class="ffp-card">
             <h3>Leveringer</h3>
             <div class="ffp-driver-actions">
                 <button class="button" id="ffp-refresh">Oppdater</button>
-                <a class="button" href="<?php echo esc_url(wp_logout_url(get_permalink())); ?>">Logg ut</a>
+                <a class="button" href="<?php echo esc_url($logout_url); ?>">Logg ut</a>
             </div>
             <div id="ffp-driver-list">Laster...</div>
         </div>

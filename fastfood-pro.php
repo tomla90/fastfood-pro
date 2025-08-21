@@ -28,13 +28,21 @@ require_once FFP_DIR . 'includes/autoload.php';
 // Activation / Uninstall (må være navngitte callbacks – ikke Closures)
 // -----------------------------------------------------------------------------
 function ffp_activate() {
-    // Gi nødvendige caps til admin/shop_manager
-    foreach (['administrator','shop_manager'] as $role_name) {
-        if ($r = get_role($role_name)) {
-            $r->add_cap('ffp_view_orders');
-            $r->add_cap('ffp_update_orders');
+    // Administrator: gi ALLE våre ffp-caps
+    if ($r = get_role('administrator')) {
+        foreach (['ffp_view_orders','ffp_update_orders','ffp_assign_driver','ffp_manage_settings'] as $cap) {
+            $r->add_cap($cap);
+        }
+        $r->add_cap('read');
+    }
+
+    // Shop manager: grunnleggende caps
+    if ($r = get_role('shop_manager')) {
+        foreach (['ffp_view_orders','ffp_update_orders'] as $cap) {
+            $r->add_cap($cap);
         }
     }
+
     // Opprett driver-rolle hvis mangler (med grunnleggende cap)
     if (!get_role('driver')) {
         add_role('driver', __('Sjåfør', 'fastfood-pro'), [
@@ -49,6 +57,21 @@ function ffp_activate() {
     }
 }
 register_activation_hook(__FILE__, 'ffp_activate');
+
+// Self-repair: sørg for at caps er på plass ved innlasting (f.eks. etter import/rolle-endringer)
+add_action('init', function () {
+    if ($r = get_role('administrator')) {
+        foreach (['ffp_view_orders','ffp_update_orders','ffp_assign_driver','ffp_manage_settings'] as $cap) {
+            $r->add_cap($cap);
+        }
+        $r->add_cap('read');
+    }
+    if ($r = get_role('shop_manager')) {
+        foreach (['ffp_view_orders','ffp_update_orders'] as $cap) {
+            $r->add_cap($cap);
+        }
+    }
+}, 5);
 
 function ffp_uninstall() {
     // Behold data – legg evt. clean-up her senere (f.eks. delete_option(...))

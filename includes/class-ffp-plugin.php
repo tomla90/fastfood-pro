@@ -10,10 +10,17 @@ class FFP_Plugin {
   }
 
   private function __construct() {
-    // Statusklasser må lastes tidlig
-    new FFP_Statuses();
+    // 1) Roller/caps må lastes ALLER FØRST
+    if (class_exists('FFP_Roles')) {
+      new FFP_Roles();
+    }
 
-    // Moduler
+    // 2) Statusklasser må lastes tidlig
+    if (class_exists('FFP_Statuses')) {
+      new FFP_Statuses();
+    }
+
+    // 3) Moduler
     new FFP_Settings();
     new FFP_Admin_Menu();
     new FFP_Orders();

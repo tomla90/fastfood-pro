@@ -3,45 +3,31 @@ if (!defined('ABSPATH')) exit;
 
 class FFP_Driver {
 
-    const OPT_CAPS_SET = 'ffp_driver_caps_set';
-
     public function __construct() {
-        add_action('init', [__CLASS__, 'ensure_role_caps']);
-        add_filter('user_has_cap', [$this,'grant_driver_caps'], 10, 3);
-
         // Shortcodes
         add_shortcode('ffp_driver_portal', [$this,'shortcode_portal']);
         add_shortcode('ffp_login',         [$this,'shortcode_login']);
 
-        // NY: eneste du trenger – en logout-knapp som alltid redirecter riktig
+        // Logout-knapp + lett-logout handler
         add_shortcode('ffp_logout_button', [$this,'shortcode_logout_button']);
-        add_action('template_redirect',    [$this,'maybe_do_button_logout']); // håndterer ?ffp_btn_logout=1
+        add_action('template_redirect',    [$this,'maybe_do_button_logout']); // ?ffp_btn_logout=1
 
+        // Assets + admin
         add_action('wp_enqueue_scripts',   [$this,'maybe_enqueue_assets']);
         add_action('woocommerce_admin_order_data_after_order_details', [$this,'admin_driver_info']);
     }
 
-    public static function ensure_role_caps() {
-        if (!get_option(self::OPT_CAPS_SET)) {
-            if (!get_role('driver')) add_role('driver', __('Driver', 'fastfood-pro'), ['read' => true]);
-            if ($role = get_role('driver')) $role->add_cap('ffp_view_orders');
-            update_option(self::OPT_CAPS_SET, 1);
-        }
-    }
-
-    public function grant_driver_caps($allcaps, $caps, $args) {
-        $user = get_user_by('id', $args[1] ?? 0);
-        if (!$user) return $allcaps;
-        $roles = (array) $user->roles;
-        if (in_array('driver', $roles, true) || in_array('ffp_driver', $roles, true)) {
-            $allcaps['ffp_view_orders'] = true;
-            $allcaps['read']            = true;
-        }
-        return $allcaps;
+    /** Hjelper: er innlogget bruker sjåfør? */
+    private function is_driver_role(): bool {
+        if (!is_user_logged_in()) return false;
+        $u = wp_get_current_user();
+        $roles = (array) ($u ? $u->roles : []);
+        return in_array('driver', $roles, true) || in_array('ffp_driver', $roles, true);
     }
 
     public function shortcode_portal() {
-        if (!is_user_logged_in() || !current_user_can('ffp_view_orders')) {
+        // Stram inn slik at bare sjåfører kan se portalen
+        if (!$this->is_driver_role()) {
             return '<div class="ffp-login"><p>' .
                    esc_html__('Logg inn som sjåfør for å se dine leveringer.', 'fastfood-pro') .
                    '</p>' . wp_login_form(['echo'=>false]) . '</div>';
@@ -71,67 +57,42 @@ class FFP_Driver {
         return ob_get_clean();
     }
 
-    /** Eneste du trenger i builderen:
-     * [ffp_logout_button redirect="/driver-portal/" label="Logg ut" class="button"]
-     * Vises kun når innlogget. Logger ut uten å trigge wp_logout-hooks og redirecter dit du ber om.
-     */
+    /** [ffp_logout_button redirect="/driver-portal/" label="Logg ut" class="button"] */
     public function shortcode_logout_button($atts = []) {
-        if (!is_user_logged_in()) return ''; // vis ikke når utlogget
+        if (!is_user_logged_in()) return '';
         $a = shortcode_atts([
             'redirect' => '/driver-portal/',
             'label'    => __('Logg ut', 'fastfood-pro'),
             'class'    => 'button',
         ], $atts);
 
-        // Normaliser target
         $target = (strpos($a['redirect'], 'http') === 0) ? $a['redirect'] : home_url($a['redirect']);
 
-        // Pek til vår egen "lette" logout-handler (ingen rewrite nødvendig)
         $url = add_query_arg([
             'ffp_btn_logout' => 1,
             'redirect_to'    => $target,
         ], home_url('/'));
 
-        return sprintf(
-            '<a href="%s" class="%s">%s</a>',
-            esc_url($url),
-            esc_attr($a['class']),
-            esc_html($a['label'])
-        );
+        return sprintf('<a href="%s" class="%s">%s</a>', esc_url($url), esc_attr($a['class']), esc_html($a['label']));
     }
 
-    /** Utfør "lett" logout når ?ffp_btn_logout=1 – omgår andre wp_logout-redirects */
+    /** Lett logout: omgår wp_logout-hooks som kan hijacke redirect */
     public function maybe_do_button_logout() {
         if (!isset($_GET['ffp_btn_logout']) || (int) $_GET['ffp_btn_logout'] !== 1) return;
 
-        // Bare hvis innlogget
         if (is_user_logged_in()) {
-            if (function_exists('wp_destroy_current_session')) {
-                wp_destroy_current_session();
-            }
+            if (function_exists('wp_destroy_current_session')) wp_destroy_current_session();
             wp_clear_auth_cookie();
             wp_set_current_user(0);
-            /**
-             * Ikke kall wp_logout() – den fyrer 'wp_logout' som andre hooks kan hijacke.
-             * Vi har allerede logget ut ved å rydde cookies/sesjon.
-             */
         }
 
-        // Bestem redirect (tillat full URL på samme domene, eller relativ sti)
         $home  = home_url('/');
         $redir = isset($_GET['redirect_to']) ? wp_unslash($_GET['redirect_to']) : $home;
 
-        // Relativ → gjør om til absolutt
-        if (strpos($redir, '/') === 0) {
-            $redir = home_url($redir);
-        }
-
-        // Sjekk at domenet matcher
+        if (strpos($redir, '/') === 0) $redir = home_url($redir);
         $home_host  = wp_parse_url($home, PHP_URL_HOST);
         $redir_host = wp_parse_url($redir, PHP_URL_HOST);
-        if (!$redir_host || strcasecmp($home_host, $redir_host) !== 0) {
-            $redir = $home;
-        }
+        if (!$redir_host || strcasecmp($home_host, $redir_host) !== 0) $redir = $home;
 
         wp_safe_redirect($redir);
         exit;
